@@ -34,7 +34,23 @@ export default defineBackground(() => {
     // Firefox has no sidePanel; its sidebar_action opens on its own.
   });
 
-  browser.runtime.onMessage.addListener((raw, _sender, sendResponse) => {
+  // A navigation replaces the frames, so what we knew about them is stale.
+  browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    if (changeInfo.status === 'loading') formFrames.delete(tabId);
+  });
+  browser.tabs.onRemoved.addListener((tabId) => formFrames.delete(tabId));
+
+  browser.runtime.onMessage.addListener((raw, sender, sendResponse) => {
+    const message = raw as { type?: string; fieldCount?: number };
+
+    if (message.type === 'frame-ready') {
+      if (sender.tab?.id !== undefined && sender.frameId !== undefined) {
+        rememberFrame(sender.tab.id, sender.frameId, message.fieldCount ?? 0);
+      }
+      sendResponse({ ok: true });
+      return false;
+    }
+
     void handle(raw as ToBackground | { type: 'get-profile' })
       .then(sendResponse)
       .catch((error: unknown) => {
@@ -76,12 +92,13 @@ async function withContentScript<T>(
       files: ['content-scripts/content.js'],
     });
   } catch {
-    const tab = await browser.tabs.get(tabId);
-    const origin = tab.url ? new URL(tab.url).origin : '';
+    // `tab.url` is only readable once activeTab has been granted, which is
+    // precisely what is missing here -- so naming the site is impossible and
+    // the message has to be actionable without it.
     throw new Error(
-      origin
-        ? `fieldwise needs your permission to read ${origin}. Click the toolbar icon on that page and try again.`
-        : 'fieldwise cannot read this page.',
+      'fieldwise has no access to this page. Click the fieldwise icon in the ' +
+        'toolbar while the page is open, then scan again. Browser pages ' +
+        '(chrome://, the Web Store), PDFs and local files can never be read.',
     );
   }
 
@@ -106,6 +123,28 @@ function isNoReceiver(error: unknown): boolean {
  * itself a tab and so is never the active one. If the active tab turns out to
  * be unreachable, the send fails and the panel says so.
  */
+/**
+ * Which frame of each tab holds the application form.
+ *
+ * A job board commonly embeds its ATS in a cross-origin iframe, leaving the
+ * top frame with no fields at all, so messaging frame 0 reaches a page that
+ * has nothing to fill. Frames announce themselves and the one reporting the
+ * most fields wins.
+ */
+const formFrames = new Map<number, { frameId: number; fieldCount: number }>();
+
+function rememberFrame(tabId: number, frameId: number, fieldCount: number): void {
+  const current = formFrames.get(tabId);
+  if (!current || fieldCount > current.fieldCount) {
+    formFrames.set(tabId, { frameId, fieldCount });
+  }
+}
+
+/** The frame to address, falling back to the top one. */
+function targetFrame(tabId: number): number {
+  return formFrames.get(tabId)?.frameId ?? 0;
+}
+
 async function activeTabId(): Promise<number> {
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) throw new Error('Open a job application page, then scan again.');
@@ -135,24 +174,32 @@ async function handle(message: ToBackground | { type: 'get-profile' }): Promise<
             profileJson: JSON.stringify(profile),
             includeDemographics: profile.demographics.enabled,
           },
-          { frameId: 0 },
+          { frameId: targetFrame(id) },
         ),
       );
     }
 
     case 'apply':
       return withContentScript(await activeTabId(), (id) =>
-        browser.tabs.sendMessage(id, { type: 'apply', fieldIds: message.fieldIds }, { frameId: 0 }),
+        browser.tabs.sendMessage(
+          id,
+          { type: 'apply', fieldIds: message.fieldIds },
+          { frameId: targetFrame(id) },
+        ),
       );
 
     case 'undo':
       return withContentScript(await activeTabId(), (id) =>
-        browser.tabs.sendMessage(id, { type: 'undo' }, { frameId: 0 }),
+        browser.tabs.sendMessage(id, { type: 'undo' }, { frameId: targetFrame(id) }),
       );
 
     case 'highlight':
       return withContentScript(await activeTabId(), (id) =>
-        browser.tabs.sendMessage(id, { type: 'highlight', fieldId: message.fieldId }, { frameId: 0 }),
+        browser.tabs.sendMessage(
+          id,
+          { type: 'highlight', fieldId: message.fieldId },
+          { frameId: targetFrame(id) },
+        ),
       );
 
     case 'get-ai-settings':
@@ -176,7 +223,7 @@ async function handle(message: ToBackground | { type: 'get-profile' }): Promise<
         browser.tabs.sendMessage(
           id,
           { type: 'expand-rows', section: message.section, target },
-          { frameId: 0 },
+          { frameId: targetFrame(id) },
         ),
       );
     }
@@ -236,7 +283,7 @@ async function runAi(): Promise<unknown> {
   const collected = (await browser.tabs.sendMessage(
     tabId,
     { type: 'collect-unmatched' },
-    { frameId: 0 },
+    { frameId: targetFrame(tabId) },
   )) as { ok: boolean; skeleton?: SkeletonField[] };
 
   const skeleton = collected.skeleton ?? [];
@@ -265,7 +312,7 @@ async function runAi(): Promise<unknown> {
     return browser.tabs.sendMessage(
       tabId,
       { type: 'guard-ai', raw: result.text, sent: skeleton },
-      { frameId: 0 },
+      { frameId: targetFrame(tabId) },
     );
   } finally {
     clearTimeout(timer);

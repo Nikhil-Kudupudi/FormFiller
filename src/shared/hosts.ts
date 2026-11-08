@@ -28,6 +28,10 @@ export const ATS_HOSTS = [
   '*://*.eightfold.ai/*',
   '*://*.successfactors.com/*',
   '*://*.successfactors.eu/*',
+  // Board front-ends that embed one of the above in an iframe. Listed so the
+  // outer page is readable too; the form itself is matched by its own host.
+  '*://app.careerpuck.com/*',
+  '*://*.careerpuck.com/*',
 ] as const;
 
 /**

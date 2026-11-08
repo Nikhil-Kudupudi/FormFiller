@@ -59,6 +59,33 @@ export default defineContentScript({
     const stopTracking = trackMarkers(redraw);
     addEventListener('pagehide', stopTracking, { once: true });
 
+    /**
+     * Tell the service worker this frame holds a form.
+     *
+     * A job board commonly embeds its ATS in a cross-origin iframe -- the
+     * outer page then has no fields at all -- so the frame that owns the
+     * form is not necessarily the top one. Each frame reports what it can
+     * see and the worker addresses whichever has the most.
+     *
+     * Reported rather than discovered from the worker's side because
+     * enumerating frames needs the webNavigation permission, and a frame
+     * already running this script can simply say so for free.
+     */
+    const announce = () => {
+      const fields = collectFields().filter((c) => c.visible && !c.honeypot);
+      if (fields.length === 0) return;
+      void browser.runtime
+        .sendMessage({ type: 'frame-ready', fieldCount: fields.length })
+        .catch(() => {
+          // The worker may not be listening yet; the panel's own scan will
+          // trigger another announcement.
+        });
+    };
+
+    announce();
+    // Single-page boards mount their form after the first idle tick.
+    setTimeout(announce, 800);
+
     /** Build the panel's view of this page. */
     function scan(profile: Profile, includeDemographics: boolean): ScanResult {
       const candidates = collectFields();
@@ -279,10 +306,6 @@ export default defineContentScript({
 
     browser.runtime.onMessage.addListener((raw, _sender, sendResponse) => {
       const message = raw as ToContent;
-
-      // Only the top frame answers, so an embedded application iframe does not
-      // produce a second competing scan for the same page.
-      if (window.top !== window) return false;
 
       switch (message.type) {
         case 'scan': {

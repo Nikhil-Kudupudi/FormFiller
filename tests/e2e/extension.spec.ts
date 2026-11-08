@@ -14,6 +14,8 @@ const EXTENSION = path.resolve(here, '../../.output/chrome-mv3');
 const ATS_URL = 'https://jobs.lever.co/acme/engineer/apply';
 const ATS_DROPDOWN_URL = 'https://jobs.lever.co/acme/engineer/dropdowns';
 const ATS_REPEATER_URL = 'https://jobs.lever.co/acme/engineer/repeaters';
+/** A board that embeds its ATS: the outer page holds no fields at all. */
+const EMBEDDED_URL = 'http://127.0.0.1:4321/embedded.html';
 const FIXTURE_ORIGIN = 'http://127.0.0.1:4321';
 
 /**
@@ -329,4 +331,34 @@ test('offers to add rows and fills them once added', async ({ context, extension
   const schools = target.locator('#edu-rows input[name="school"]');
   await expect(schools.nth(0)).toHaveValue('MIT', { timeout: 10_000 });
   await expect(schools.nth(1)).toHaveValue('Cambridge');
+});
+
+test('fills a form embedded in an iframe', async ({ context, extensionId }) => {
+  await seedProfile(context);
+  await routeFixture(context);
+
+  const target = await context.newPage();
+  await target.goto(EMBEDDED_URL);
+  // The form is in the iframe; the top frame has nothing.
+  await expect(target.locator('#ats')).toBeVisible();
+
+  const panel = await context.newPage();
+  await panel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+  await target.bringToFront();
+
+  await panel.getByRole('button', { name: 'Scan page' }).click();
+
+  // Addressing the top frame would find no fields and report the page as
+  // unreadable, which is what job boards wrapping Greenhouse used to do.
+  const fill = panel.getByRole('button', { name: /^Fill \d+ fields?$/ });
+  await expect(fill).toBeVisible({ timeout: 15_000 });
+  await fill.click();
+
+  const form = target.frameLocator('#ats');
+  await expect(form.locator('#fn')).toHaveValue('Ada', { timeout: 15_000 });
+  await expect(form.locator('#em')).toHaveValue('ada@example.com');
+
+  // The safety rules hold inside the frame too.
+  await expect(form.locator('[name=password]')).toHaveValue('');
+  await expect(form.locator('[name=url]')).toHaveValue('');
 });
