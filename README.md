@@ -26,7 +26,21 @@ These are constraints, not preferences.
 
 ## Status
 
-Early. The scaffold builds for Chrome and Firefox; the detection and fill engines are in progress.
+Early, but the core works and is tested.
+
+**Done** — builds for Chrome and Firefox from one source tree; profile schema with versioned
+migrations; field detection (attributes, eight label strategies, weighted scoring with an
+ambiguity margin); the deny-list and honeypot guard; the fill engine, including the value-tracker
+workaround that makes a write survive a framework re-render; 73 unit tests and 9 browser tests.
+
+**Next** — the side-panel preview UI, per-ATS adapters, work-history and education repeaters, the
+AI fallback, and per-site learned overrides.
+
+Verified against the kitchen-sink fixture in Chromium: 17 fields filled with none failing
+read-back, all ten honeypots left empty, password/search/newsletter/referrer/cover-letter
+untouched, both consent boxes unchecked, the salutation select left alone while the real job title
+filled, authorization and sponsorship answered with opposite values, and the country select
+resolving to "United States of America" rather than the Minor Outlying Islands.
 
 ## Developing
 
