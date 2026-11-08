@@ -26,58 +26,27 @@ These are constraints, not preferences.
 
 ## Status
 
-Early, but the core works and is tested.
+Usable. Scan a page, review what will be written, correct anything wrong, apply, undo.
 
-**Done** — builds for Chrome and Firefox from one source tree; profile schema with versioned
-migrations; field detection (attributes, eight label strategies, weighted scoring with an
-ambiguity margin); the deny-list and honeypot guard; the fill engine, including the value-tracker
-workaround that makes a write survive a framework re-render; the AI fallback with adapters for
-Gemini, Grok, OpenAI and Anthropic; 100 unit tests and 13 browser tests.
+**Done** — builds for Chrome and Firefox from one source tree; profile editor with versioned
+migrations and import/export; field detection (attributes, eight label strategies, weighted
+scoring with an ambiguity margin); the deny-list and honeypot guard; the fill engine with the
+MAIN-world bridge that makes a write survive a framework re-render; the side panel preview with
+per-field confidence and undo; the AI fallback with adapters for Gemini, Grok, OpenAI and
+Anthropic. 102 unit tests and 19 browser tests, five of which drive the real packed extension.
 
-**Next** — the side-panel preview UI, per-ATS adapters, work-history and education repeaters, and
-per-site learned overrides.
+**Next** — per-ATS adapters (Greenhouse and Lever first), work-history and education repeaters on
+multi-row forms, per-site learned overrides, and resume attach.
 
-Verified against the kitchen-sink fixture in Chromium: 17 fields filled with none failing
-read-back, all ten honeypots left empty, password/search/newsletter/referrer/cover-letter
-untouched, both consent boxes unchecked, the salutation select left alone while the real job title
-filled, authorization and sponsorship answered with opposite values, and the country select
-resolving to "United States of America" rather than the Minor Outlying Islands.
+### Known gaps
 
-## Developing
-
-```bash
-npm install
-npm run dev              # Chrome, with HMR
-npm run dev:firefox      # Firefox
-npm run test             # unit tests (detection engine)
-npm run test:e2e         # Playwright, real extension, real browser
-npm run build            # production build
-npm run zip              # store-ready zip
-npm run zip:firefox      # extension zip + the sources zip AMO requires
-```
-
-Loading unpacked: build, then point `chrome://extensions` → *Load unpacked* at `.output/chrome-mv3`.
-Edge and Brave consume the same Chromium build unchanged.
-
-## Architecture
-
-The content script runs in the page's isolated world and **never holds the API key**. It sends a
-sanitized field skeleton to the service worker, which owns the key and makes the provider call. That
-isn't only hygiene: since Chrome 85 a content script's `fetch` carries the *page's* origin and is
-subject to CORS even when the extension holds host permissions, so the call couldn't work from there
-anyway.
-
-A second content script runs in the **MAIN world** on Greenhouse and BambooHR. React records an
-input's last-seen value on `el._valueTracker`, a page-world object an isolated script can't reliably
-reach. Without resetting it, React compares the DOM value against the tracker, sees no change,
-swallows the `input` event, and the next render wipes what was written. That script shares the
-page's JS heap, so it can — and because the page can reach it too, it validates every message's
-origin and shape before acting.
-
-Permissions are deliberately narrow. The extension declares only the ATS hosts it supports plus the
-four LLM endpoints; broader access lives in `optional_host_permissions` and is granted per site, by
-you, at runtime. A hard-coded deny-list keeps it off banking, tax, health and webmail domains
-regardless.
+- The content script bundle is ~127 KB, heavier than it should be for code injected into every
+  matching page. Zod reaches it through the profile schema; the validation belongs in the service
+  worker instead.
+- Repeating sections fill only the first row. A form with three employer rows gets one.
+- Custom dropdowns, async typeaheads and split date fields are not implemented yet, which is most
+  of what makes Workday hard.
+- Firefox builds but is untested locally.
 
 ## What the AI fallback sends
 
