@@ -33,21 +33,22 @@ migrations and import/export; field detection (attributes, eight label strategie
 scoring with an ambiguity margin); the deny-list and honeypot guard; the fill engine with the
 MAIN-world bridge that makes a write survive a framework re-render; custom dropdowns, including
 portalled menus, keyboard-only controls and async typeaheads; dates in all four shapes, including
-split month/day/year controls; the side panel preview with per-field confidence and undo; the AI
-fallback with adapters for Gemini, Grok, OpenAI and Anthropic. 145 unit tests and 36 browser
-tests, seven of which drive the real packed extension.
+split month/day/year controls; repeating sections, so each employer row gets its own job; the side
+panel preview with per-field confidence and undo; the AI fallback with adapters for Gemini, Grok,
+OpenAI and Anthropic. 158 unit tests and 43 browser tests, nine of which drive the real packed
+extension.
 
-**Next** — per-ATS adapters (Greenhouse and Lever first), work-history and education repeaters on
-multi-row forms, per-site learned overrides, and resume attach.
+**Next** — per-ATS adapters (Greenhouse and Lever first), per-site learned overrides, and resume
+attach.
 
 ### Known gaps
 
 - The content script bundle is ~127 KB, heavier than it should be for code injected into every
   matching page. Zod reaches it through the profile schema; the validation belongs in the service
   worker instead.
-- Repeating sections are not handled. Every row of a form resolves against the *first* profile
-  entry, so a three-employer form gets the same job written into all three rows rather than one
-  job each. Review before submitting any form with more than one work or education row.
+- Repeating rows are matched by the fields they contain, so a form whose rows differ structurally
+  — an extra question in one row only — may not group them. Those fields fall back to the first
+  entry, so check a multi-row form before submitting.
 - A split date whose group has no date heading of its own cannot be identified. Those controls
   are reported as unrecognised rather than guessed at, which is the right outcome but still a gap.
 - Datepicker widgets that refuse typed input are not driven yet.
