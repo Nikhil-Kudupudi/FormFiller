@@ -32,12 +32,13 @@ Usable. Scan a page, review what will be written, correct anything wrong, apply,
 migrations and import/export; field detection (attributes, eight label strategies, weighted
 scoring with an ambiguity margin); the deny-list and honeypot guard; the fill engine with the
 MAIN-world bridge that makes a write survive a framework re-render; custom dropdowns, including
-portalled menus, keyboard-only controls and async typeaheads; the side panel preview with
-per-field confidence and undo; the AI fallback with adapters for Gemini, Grok, OpenAI and
-Anthropic. 122 unit tests and 28 browser tests, seven of which drive the real packed extension.
+portalled menus, keyboard-only controls and async typeaheads; dates in all four shapes, including
+split month/day/year controls; the side panel preview with per-field confidence and undo; the AI
+fallback with adapters for Gemini, Grok, OpenAI and Anthropic. 145 unit tests and 36 browser
+tests, seven of which drive the real packed extension.
 
 **Next** — per-ATS adapters (Greenhouse and Lever first), work-history and education repeaters on
-multi-row forms, split date fields, per-site learned overrides, and resume attach.
+multi-row forms, per-site learned overrides, and resume attach.
 
 ### Known gaps
 
@@ -45,7 +46,9 @@ multi-row forms, split date fields, per-site learned overrides, and resume attac
   matching page. Zod reaches it through the profile schema; the validation belongs in the service
   worker instead.
 - Repeating sections fill only the first row. A form with three employer rows gets one.
-- Split date fields (three selects for month, day and year) are not handled yet.
+- A split date whose group has no date heading of its own cannot be identified. Those controls
+  are reported as unrecognised rather than guessed at, which is the right outcome but still a gap.
+- Datepicker widgets that refuse typed input are not driven yet.
 - Undo does not clear a custom dropdown. There is no standard way to reset one, and driving a
   widget's own UI to do it risks leaving a worse state than the one being undone, so the panel
   reports it instead.
