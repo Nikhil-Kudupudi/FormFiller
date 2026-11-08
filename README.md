@@ -31,10 +31,11 @@ Early, but the core works and is tested.
 **Done** — builds for Chrome and Firefox from one source tree; profile schema with versioned
 migrations; field detection (attributes, eight label strategies, weighted scoring with an
 ambiguity margin); the deny-list and honeypot guard; the fill engine, including the value-tracker
-workaround that makes a write survive a framework re-render; 73 unit tests and 9 browser tests.
+workaround that makes a write survive a framework re-render; the AI fallback with adapters for
+Gemini, Grok, OpenAI and Anthropic; 100 unit tests and 13 browser tests.
 
-**Next** — the side-panel preview UI, per-ATS adapters, work-history and education repeaters, the
-AI fallback, and per-site learned overrides.
+**Next** — the side-panel preview UI, per-ATS adapters, work-history and education repeaters, and
+per-site learned overrides.
 
 Verified against the kitchen-sink fixture in Chromium: 17 fields filled with none failing
 read-back, all ten honeypots left empty, password/search/newsletter/referrer/cover-letter
@@ -77,6 +78,23 @@ Permissions are deliberately narrow. The extension declares only the ATS hosts i
 four LLM endpoints; broader access lives in `optional_host_permissions` and is granted per site, by
 you, at runtime. A hard-coded deny-list keeps it off banking, tax, health and webmail domains
 regardless.
+
+## What the AI fallback sends
+
+The model is asked what a field *means*, never what should go in it. It receives an opaque id and
+the field's shape — tag, type, label, a few attribute names, and the option labels of a select —
+and may answer only with that id plus a key from a closed enum. Values come from your local
+profile by key lookup in packaged code, so the model has no way to supply one.
+
+The payload is built as an allow-list rather than by stripping the page, which means page prose,
+HTML comments, `alt` and `title` text have no route into it. Deny-listed fields are left out
+entirely: a payload that never describes a password field cannot be talked into targeting one.
+
+This matters because a job posting is attacker-controlled text — anyone can post a job. A test
+fixture carries fifteen prompt injections hidden eight different ways, and asserts none of them
+reach the payload. The real protection, though, isn't the filtering: it's that every answer is
+re-validated against the closed enum, the deny-list and the live DOM before anything is written.
+An instruction that reaches the model still has nothing it can make the model do.
 
 ## On the API key
 
