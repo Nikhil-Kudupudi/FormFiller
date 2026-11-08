@@ -7,6 +7,8 @@
  * engine directly and asserting on what it decided.
  */
 import { collectFields, detectFields, type DetectedField } from '@/core/detect/collect';
+import { buildSkeleton } from '@/core/ai/skeleton';
+import type { SkeletonField } from '@/core/ai/types';
 import { selectOption, setValue } from '@/core/fill/setValue';
 import type { FieldKey } from '@/core/profile/keys';
 
@@ -104,7 +106,10 @@ function alternatives(value: string): string[] {
 declare global {
   interface Window {
     __fieldwise: { run: () => FillReport };
+    /** Exposes the outgoing AI payload so tests can assert on what leaves. */
+    __fwSkeleton: () => SkeletonField[];
   }
 }
 
 window.__fieldwise = { run };
+window.__fwSkeleton = () => buildSkeleton(collectFields());

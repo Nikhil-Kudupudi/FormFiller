@@ -35,7 +35,11 @@ function hiddenAncestor(el: Element): string | undefined {
     if (style.visibility === 'hidden' || style.visibility === 'collapse') {
       return 'ancestor visibility:hidden';
     }
-    if (Number(style.opacity) === 0) return 'ancestor opacity:0';
+    // Parse explicitly rather than `Number(style.opacity) === 0`: an absent or
+    // unparseable value yields '' and `Number('')` is 0, which would wrongly
+    // mark a perfectly visible field as hidden.
+    const opacity = Number.parseFloat(style.opacity);
+    if (Number.isFinite(opacity) && opacity === 0) return 'ancestor opacity:0';
     if (style.contentVisibility === 'hidden') return 'ancestor content-visibility:hidden';
     if (node.hasAttribute('hidden')) return 'ancestor [hidden]';
     if (node.hasAttribute('inert')) return 'ancestor [inert]';
