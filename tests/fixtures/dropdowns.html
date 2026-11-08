@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>fieldwise fixture — custom dropdowns</title>
+<style>
+  body { font: 14px/1.5 system-ui, sans-serif; max-width: 44rem; margin: 2rem auto; padding: 0 1rem; }
+  fieldset { border: 1px solid #ccc; border-radius: 6px; margin: 0 0 1.25rem; padding: 1rem; }
+  legend { font-weight: 600; padding: 0 .4rem; }
+  label { display: block; margin: .5rem 0 .15rem; }
+  .control {
+    border: 1px solid #999; border-radius: 4px; padding: .45rem .6rem;
+    cursor: pointer; background: #fff; min-height: 1.4em;
+  }
+  .placeholder { color: #888; }
+  .menu {
+    position: absolute; z-index: 10; background: #fff; border: 1px solid #999;
+    border-radius: 4px; margin-top: 2px; max-height: 12rem; overflow: auto;
+    min-width: 18rem; box-shadow: 0 4px 12px rgba(0,0,0,.12);
+  }
+  .menu[hidden] { display: none; }
+  .opt { padding: .35rem .6rem; }
+  .opt:hover { background: #eef2ff; }
+  .status { padding: .35rem .6rem; color: #888; }
+  .chips { display: flex; gap: .3rem; margin-top: .3rem; }
+  .chip { background: #e5e7eb; border-radius: 3px; padding: .1rem .4rem; font-size: .85em; }
+</style>
+</head>
+<body>
+<h1>Custom dropdowns</h1>
+
+<form id="application">
+
+  <fieldset>
+    <legend>Portalled menu, opens on mousedown</legend>
+    <!-- react-select's shape: the menu is appended to <body>, not nested
+         here, and a plain .click() opens then immediately closes it. -->
+    <label id="country-label">Country</label>
+    <div class="control select__control" role="combobox" aria-haspopup="listbox"
+         aria-expanded="false" aria-labelledby="country-label" id="country-control" tabindex="0">
+      <span class="select__single-value placeholder">Select...</span>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Keyboard only</legend>
+    <!-- Ignores mouse events on the control entirely; opens on ArrowDown. -->
+    <label id="degree-label">Degree</label>
+    <div class="control" role="combobox" aria-haspopup="listbox"
+         aria-labelledby="degree-label" id="degree-control" tabindex="0">
+      <span class="value placeholder">Select...</span>
+    </div>
+    <div class="menu" id="degree-menu" role="listbox" hidden></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Async typeahead with out-of-order responses</legend>
+    <!-- Shows a clickable "Loading…" row, answers out of order, and keeps
+         the value the form submits in a hidden companion field. -->
+    <label id="school-label">School</label>
+    <div class="control" id="school-control">
+      <input id="school" role="combobox" aria-autocomplete="list"
+             aria-controls="school-menu" aria-labelledby="school-label"
+             placeholder="Start typing" autocomplete="off">
+    </div>
+    <div class="menu" id="school-menu" role="listbox" hidden></div>
+    <input type="hidden" id="school_id" name="school_id">
+  </fieldset>
+
+  <fieldset>
+    <legend>Multiselect with chips</legend>
+    <!-- The chip tray also carries role=listbox. Searching it would
+         "select" whatever was already chosen. -->
+    <label id="skills-label">Skills</label>
+    <div class="control" role="combobox" aria-haspopup="listbox"
+         aria-labelledby="skills-label" id="skills-control" tabindex="0">
+      <span class="value placeholder">Select...</span>
+      <div class="chips" role="listbox" data-automation-id="selectedItemList">
+        <span class="chip" role="option">Already chosen</span>
+      </div>
+    </div>
+    <div class="menu" id="skills-menu" role="listbox" hidden></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Ambiguous options</legend>
+    <!-- "Virginia" prefix-matches "Virginia" and "Virginia Beach"; an
+         unguarded prefix match would pick whichever came first. -->
+    <label id="state-label">State</label>
+    <div class="control" role="combobox" aria-haspopup="listbox"
+         aria-labelledby="state-label" id="state-control" tabindex="0">
+      <span class="value placeholder">Select...</span>
+    </div>
+    <div class="menu" id="state-menu" role="listbox" hidden></div>
+  </fieldset>
+
+</form>
+
+<script src="./dropdowns.js"></script>
+<script src="./dropdown-probe.js"></script>
+</body>
+</html>

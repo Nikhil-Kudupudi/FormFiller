@@ -232,6 +232,8 @@ describe('undo restores by element kind', () => {
         visible: true,
         honeypot: false,
         prefilled: true,
+        isCombobox: false,
+        isTypeahead: false,
       },
     ]);
 
@@ -263,6 +265,8 @@ describe('undo restores by element kind', () => {
         visible: true,
         honeypot: false,
         prefilled: false,
+        isCombobox: false,
+        isTypeahead: false,
       },
     ]);
 

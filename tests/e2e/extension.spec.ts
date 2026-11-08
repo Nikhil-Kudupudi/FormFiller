@@ -12,6 +12,7 @@ const EXTENSION = path.resolve(here, '../../.output/chrome-mv3');
  * of what this suite proves.
  */
 const ATS_URL = 'https://jobs.lever.co/acme/engineer/apply';
+const ATS_DROPDOWN_URL = 'https://jobs.lever.co/acme/engineer/dropdowns';
 const FIXTURE_ORIGIN = 'http://127.0.0.1:4321';
 
 /**
@@ -53,7 +54,9 @@ async function routeFixture(context: BrowserContext): Promise<void> {
     const file =
       url.pathname === '/acme/engineer/apply'
         ? 'kitchen-sink.html'
-        : url.pathname.split('/').pop();
+        : url.pathname === '/acme/engineer/dropdowns'
+          ? 'dropdowns.html'
+          : url.pathname.split('/').pop();
     const upstream = await fetch(`${FIXTURE_ORIGIN}/${file}`);
     await route.fulfill({
       status: upstream.status,
@@ -214,4 +217,36 @@ test('undo puts the form back', async ({ context, extensionId }) => {
   // this is the only thing standing between a user and a wiped draft.
   await expect(target.locator('#fn')).toHaveValue('');
   await expect(target.locator('#em')).toHaveValue('');
+});
+
+test('fills a custom dropdown through the extension', async ({ context, extensionId }) => {
+  await seedProfile(context);
+  await routeFixture(context);
+
+  const target = await context.newPage();
+  await target.goto(ATS_DROPDOWN_URL);
+  const panel = await context.newPage();
+  await panel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+  await target.bringToFront();
+
+  await panel.getByRole('button', { name: 'Scan page' }).click();
+
+  // "Country" and "State" are ambiguous labels, so they arrive unticked and
+  // the Fill button starts disabled -- the design refusing to act on a guess.
+  // Ticking one is exactly what a user does, and it is worth asserting that
+  // this is the state the panel opens in.
+  const fill = panel.getByRole('button', { name: /^Fill \d+ fields?$/ });
+  await expect(fill).toBeVisible({ timeout: 10_000 });
+  await expect(fill).toBeDisabled();
+
+  await panel.getByRole('checkbox').first().check();
+  await expect(fill).toBeEnabled();
+  await fill.click();
+
+  // The portalled, mousedown-only country widget, driven the whole way from
+  // the side panel rather than by calling the engine directly.
+  await expect(target.locator('#country-control .select__single-value')).toHaveText(
+    'United States of America',
+    { timeout: 15_000 },
+  );
 });

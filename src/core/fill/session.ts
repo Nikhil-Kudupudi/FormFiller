@@ -2,6 +2,7 @@ import type { FieldCandidate } from '@/core/detect/collect';
 import { selectOption, setChecked, setValue, type FillableElement } from './setValue';
 import { assessVisibility } from '@/core/detect/visibility';
 import { writeViaMainWorld } from './bridge';
+import { displayedValue, fillCombobox, isCombobox } from './combobox';
 
 /**
  * One scan-and-fill session on a page.
@@ -13,9 +14,11 @@ import { writeViaMainWorld } from './bridge';
  */
 
 interface Snapshot {
-  element: FillableElement;
+  element: FillableElement | HTMLElement;
   previousValue: string;
   previousChecked?: boolean;
+  /** Set for a custom dropdown, which has no `.value` to put back. */
+  combobox?: boolean;
 }
 
 /** True only for inputs where `checked` is the value that matters. */
@@ -81,6 +84,27 @@ export class FillSession {
     }
 
     const el = candidate.element;
+
+    // A custom dropdown is usually a div with a portalled menu, so it is
+    // handled before the plain-element check below -- which would otherwise
+    // reject it as unfillable.
+    if (isCombobox(el)) {
+      if (displayedValue(el) && !this.written.has(fieldId)) {
+        return { ...base, ok: false, reason: 'you have chosen here, left alone' };
+      }
+      this.snapshotCombobox(fieldId, el);
+
+      const result = await fillCombobox(el, candidateValues, {
+        typeInto: candidate.isTypeahead,
+      });
+
+      if (result.ok && result.chosen !== undefined) {
+        this.written.set(fieldId, result.chosen);
+        return { fieldId, label, value: result.chosen, ok: true };
+      }
+      return { ...base, ok: false, reason: result.reason ?? 'could not be chosen' };
+    }
+
     if (
       !(el instanceof HTMLInputElement) &&
       !(el instanceof HTMLTextAreaElement) &&
@@ -152,6 +176,22 @@ export class FillSession {
     };
   }
 
+  /**
+   * Record what a dropdown showed before we touched it.
+   *
+   * Undo for these is best-effort: a widget's own API is the only reliable way
+   * to clear a selection, and there is no standard one. We record what it
+   * displayed so the panel can tell the user what to put back by hand.
+   */
+  private snapshotCombobox(fieldId: string, el: HTMLElement): void {
+    if (this.snapshots.has(fieldId)) return;
+    this.snapshots.set(fieldId, {
+      element: el,
+      previousValue: displayedValue(el) ?? '',
+      combobox: true,
+    });
+  }
+
   private snapshot(fieldId: string, el: FillableElement): void {
     if (this.snapshots.has(fieldId)) return;
     this.snapshots.set(fieldId, {
@@ -183,6 +223,13 @@ export class FillSession {
       const el = snapshot.element;
       if (!el.isConnected) continue;
 
+      if (snapshot.combobox) {
+        // Nothing safe to write back: clearing a custom dropdown means driving
+        // its own UI, and getting that wrong leaves a worse state than the one
+        // we are trying to undo. Reported rather than guessed at.
+        continue;
+      }
+
       if (isToggle(el) && snapshot.previousChecked !== undefined) {
         if (setChecked(el, snapshot.previousChecked)) restored += 1;
       } else if (el instanceof HTMLSelectElement) {
@@ -190,7 +237,10 @@ export class FillSession {
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
         restored += 1;
-      } else if (setValue(el, snapshot.previousValue, { blur: false })) {
+      } else if (
+        (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) &&
+        setValue(el, snapshot.previousValue, { blur: false })
+      ) {
         restored += 1;
       }
 

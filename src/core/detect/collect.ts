@@ -2,6 +2,7 @@ import type { FieldKey } from '@/core/profile/keys';
 import { classify, type Classification } from './classify';
 import { resolveLabel, type LabelSource } from './label';
 import { assessVisibility } from './visibility';
+import { isCombobox } from '@/core/fill/combobox';
 
 /**
  * Walk the document and classify every candidate field.
@@ -42,6 +43,16 @@ export interface FieldCandidate {
   honeypot: boolean;
   /** Already has a value the user or the site put there. */
   prefilled: boolean;
+  /** A custom dropdown rather than a plain field or a native select. */
+  isCombobox: boolean;
+  /**
+   * A dropdown that only loads its options once something is typed.
+   *
+   * Worth knowing separately: these hold the submitted value in a hidden
+   * companion field, so typing text that looks right but choosing nothing
+   * submits an empty answer.
+   */
+  isTypeahead: boolean;
 }
 
 export type DetectedField =
@@ -76,6 +87,21 @@ function* deepQuery(root: Document | ShadowRoot | Element, selector: string): Ge
   }
 }
 
+/**
+ * A dropdown that queries as you type.
+ *
+ * `aria-autocomplete="list"` is the standard signal; the class-name checks
+ * cover widgets that implement the behaviour without the attribute.
+ */
+function looksLikeTypeahead(el: HTMLElement): boolean {
+  if (!isCombobox(el)) return false;
+  const root = el.closest('[role="combobox"]') ?? el;
+  const input = root.querySelector('input') ?? (el instanceof HTMLInputElement ? el : null);
+  const autocomplete = input?.getAttribute('aria-autocomplete') ?? el.getAttribute('aria-autocomplete');
+  if (autocomplete === 'list' || autocomplete === 'both') return true;
+  return /typeahead|autocomplete|async|search/i.test(el.className);
+}
+
 /** Fields inside a <template> are a blueprint, never a real field. */
 function inTemplate(el: Element): boolean {
   return el.closest('template') !== null;
@@ -107,6 +133,8 @@ export function collectFields(root: Document | ShadowRoot = document): FieldCand
       visible: visibility.visible,
       honeypot: visibility.honeypot,
       prefilled: value.trim() !== '',
+      isCombobox: isCombobox(node),
+      isTypeahead: looksLikeTypeahead(node),
     });
   }
 
