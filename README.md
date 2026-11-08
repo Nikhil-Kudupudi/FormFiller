@@ -45,7 +45,9 @@ multi-row forms, per-site learned overrides, and resume attach.
 - The content script bundle is ~127 KB, heavier than it should be for code injected into every
   matching page. Zod reaches it through the profile schema; the validation belongs in the service
   worker instead.
-- Repeating sections fill only the first row. A form with three employer rows gets one.
+- Repeating sections are not handled. Every row of a form resolves against the *first* profile
+  entry, so a three-employer form gets the same job written into all three rows rather than one
+  job each. Review before submitting any form with more than one work or education row.
 - A split date whose group has no date heading of its own cannot be identified. Those controls
   are reported as unrecognised rather than guessed at, which is the right outcome but still a gap.
 - Datepicker widgets that refuse typed input are not driven yet.
