@@ -1,0 +1,25 @@
+node_modules/
+.output/
+.wxt/
+stats.html
+dist/
+*.zip
+
+# Test artifacts
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
+# Local secrets — never commit an API key
+.env
+.env.*
+!.env.example
+*.local
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db

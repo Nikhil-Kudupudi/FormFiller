@@ -1,0 +1,44 @@
+:root {
+  --fw-bg: #ffffff;
+  --fw-fg: #1a1a1a;
+  --fw-muted: #6b6b6b;
+  --fw-border: #e0e0e0;
+  --fw-accent: #2563eb;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fw-bg: #1a1a1a;
+    --fw-fg: #f0f0f0;
+    --fw-muted: #9a9a9a;
+    --fw-border: #333333;
+    --fw-accent: #60a5fa;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--fw-bg);
+  color: var(--fw-fg);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+h1 { font-size: 1.1rem; margin: 0 0 0.75rem; }
+.fw-muted { color: var(--fw-muted); }
+.fw-popup { padding: 1rem; min-width: 240px; display: grid; gap: 0.5rem; }
+.fw-panel, .fw-options { padding: 1rem; }
+.fw-options { max-width: 52rem; margin-inline: auto; }
+
+button {
+  font: inherit;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--fw-border);
+  border-radius: 6px;
+  background: var(--fw-bg);
+  color: var(--fw-fg);
+  cursor: pointer;
+}
+button:hover { border-color: var(--fw-accent); }
