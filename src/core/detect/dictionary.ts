@@ -139,6 +139,11 @@ export const DICTIONARY: FieldRule[] = [
   { key: 'education.degree', aliases: ['degree', 'degree type', 'qualification', 'level of education'] },
   { key: 'education.field', aliases: ['field of study', 'major', 'discipline', 'concentration', 'course of study'] },
   { key: 'education.gpa', aliases: ['gpa', 'grade point average'] },
+  {
+    key: 'education.endDate',
+    aliases: ['graduation date', 'graduated', 'date of graduation', 'completion date'],
+  },
+  { key: 'education.startDate', aliases: ['enrollment date', 'date enrolled'] },
 
   {
     key: 'eligibility.workAuthorized',

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>fieldwise fixture — dates</title>
+<style>
+  body { font: 14px/1.5 system-ui, sans-serif; max-width: 44rem; margin: 2rem auto; padding: 0 1rem; }
+  fieldset { border: 1px solid #ccc; border-radius: 6px; margin: 0 0 1.25rem; padding: 1rem; }
+  legend { font-weight: 600; padding: 0 .4rem; }
+  label { display: block; margin: .5rem 0 .15rem; }
+  input, select { padding: .4rem; font: inherit; }
+  .row { display: flex; gap: .6rem; align-items: flex-end; }
+  .row > div { display: grid; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<h1>Dates</h1>
+
+<form id="application">
+
+  <fieldset>
+    <legend>Native inputs</legend>
+    <!-- type=date wants YYYY-MM-DD as the *value* whatever it displays;
+         anything else is silently discarded and the field stays empty. -->
+    <label for="d1">Start Date</label>
+    <input type="date" id="d1" name="start_date">
+
+    <!-- type=month wants YYYY-MM. -->
+    <label for="d2">End Date</label>
+    <input type="month" id="d2" name="end_date">
+  </fieldset>
+
+  <fieldset>
+    <legend>Masked text</legend>
+    <!-- The page states its own mask in the placeholder. -->
+    <label for="m1">Employment Start Date</label>
+    <input type="text" id="m1" name="emp_start" placeholder="MM/YYYY" maxlength="7">
+
+    <label for="m2">Graduation Date</label>
+    <input type="text" id="m2" name="grad_date" placeholder="MM/DD/YYYY" maxlength="10">
+  </fieldset>
+
+  <fieldset id="split-start">
+    <legend>Start Date</legend>
+    <!-- Three controls, one date. Their own labels say "Month" and "Year",
+         which name a part but not which date it belongs to. -->
+    <div class="row">
+      <div>
+        <label for="s-month">Month</label>
+        <select id="s-month" name="start_month">
+          <option value="">--</option>
+          <option>January</option><option>February</option><option>March</option>
+          <option>April</option><option>May</option><option>June</option>
+          <option>July</option><option>August</option><option>September</option>
+          <option>October</option><option>November</option><option>December</option>
+        </select>
+      </div>
+      <div>
+        <label for="s-year">Year</label>
+        <select id="s-year" name="start_year">
+          <option value="">--</option>
+          <option>2019</option><option>2020</option><option>2021</option>
+          <option>2022</option><option>2023</option><option>2024</option>
+          <option>2025</option><option>2026</option>
+        </select>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset id="split-grad">
+    <legend>Graduation Date</legend>
+    <!-- Numeric months here, and a day list that overlaps 1-12 with them. -->
+    <div class="row">
+      <div>
+        <label for="g-month">Month</label>
+        <select id="g-month" name="grad_month">
+          <option value="">--</option>
+          <option>01</option><option>02</option><option>03</option><option>04</option>
+          <option>05</option><option>06</option><option>07</option><option>08</option>
+          <option>09</option><option>10</option><option>11</option><option>12</option>
+        </select>
+      </div>
+      <div>
+        <label for="g-day">Day</label>
+        <select id="g-day" name="grad_day">
+          <option value="">--</option>
+        </select>
+      </div>
+      <div>
+        <label for="g-year">Year</label>
+        <select id="g-year" name="grad_year">
+          <option value="">--</option>
+          <option>2018</option><option>2019</option><option>2020</option>
+          <option>2021</option><option>2022</option>
+        </select>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset id="current-role">
+    <legend>Current Role</legend>
+    <!-- Ticking this hides the end-date fields. An end date written first is
+         discarded along with the inputs holding it. -->
+    <label>
+      <input type="checkbox" id="is-current" name="currently_work_here">
+      I currently work here
+    </label>
+    <div class="row" id="end-wrap">
+      <div>
+        <label for="e-month">Month</label>
+        <select id="e-month" name="role_end_month">
+          <option value="">--</option>
+          <option>January</option><option>February</option><option>March</option>
+          <option>April</option><option>May</option><option>June</option>
+          <option>July</option><option>August</option><option>September</option>
+          <option>October</option><option>November</option><option>December</option>
+        </select>
+      </div>
+      <div>
+        <label for="e-year">Year</label>
+        <select id="e-year" name="role_end_year">
+          <option value="">--</option>
+          <option>2023</option><option>2024</option><option>2025</option><option>2026</option>
+        </select>
+      </div>
+    </div>
+  </fieldset>
+
+</form>
+
+<script src="./dates.js"></script>
+<script src="./date-probe.js"></script>
+</body>
+</html>

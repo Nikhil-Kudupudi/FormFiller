@@ -85,7 +85,9 @@ export default defineContentScript({
           continue;
         }
 
-        const values = resolveValue(profile, field.key);
+        const values = resolveValue(profile, field.key, {
+          ...(field.candidate.datePart ? { datePart: field.candidate.datePart } : {}),
+        });
         if (values.length === 0 || !values[0]) {
           missingValue.push({ label, reason: 'nothing in your profile for this' });
           continue;
@@ -120,7 +122,7 @@ export default defineContentScript({
       const failed: { fieldId: string; label: string; reason: string }[] = [];
       drawn = [];
 
-      for (const fieldId of fieldIds) {
+      for (const fieldId of orderForFilling(fieldIds, session, profile)) {
         const candidate = session.get(fieldId);
         if (!candidate) {
           failed.push({ fieldId, label: '(gone)', reason: 'field is no longer on the page' });
@@ -137,7 +139,9 @@ export default defineContentScript({
           continue;
         }
 
-        const values = resolveValue(profile, detected.key);
+        const values = resolveValue(profile, detected.key, {
+          ...(candidate.datePart ? { datePart: candidate.datePart } : {}),
+        });
         const outcome = await session.fill(fieldId, candidate.label || '(no label)', values);
 
         if (outcome.ok) {
@@ -271,6 +275,42 @@ export default defineContentScript({
     });
   },
 });
+
+/**
+ * Put dependent fields in an order that works.
+ *
+ * Some fields change what else exists on the page, so filling them late is
+ * the same as not filling them at all:
+ *
+ *   "I currently work here" hides the end-date fields once ticked, so an end
+ *   date written first is thrown away along with the inputs holding it.
+ *
+ *   Workday reformats a phone number on blur according to the device type, so
+ *   setting the type afterwards discards the number.
+ *
+ * Everything else keeps the order the panel listed it in.
+ */
+function orderForFilling(
+  fieldIds: string[],
+  session: FillSession,
+  profile: Profile,
+): string[] {
+  const weight = (fieldId: string): number => {
+    const candidate = session.get(fieldId);
+    if (!candidate) return 1;
+
+    const detected = detectFields([candidate], { includeDemographics: true })[0];
+    if (!detected || detected.status !== 'matched') return 1;
+
+    if (detected.key === 'contact.phoneDeviceType') return 0;
+    if (detected.key === 'work.isCurrent') return 0;
+    if (detected.key === 'work.endDate') return 2;
+    return 1;
+  };
+
+  void profile;
+  return [...fieldIds].sort((a, b) => weight(a) - weight(b));
+}
 
 /**
  * Detect a closed shadow root anywhere on the page.

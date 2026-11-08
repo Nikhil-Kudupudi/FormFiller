@@ -1,8 +1,9 @@
 import type { FieldKey } from '@/core/profile/keys';
 import { classify, type Classification } from './classify';
-import { resolveLabel, type LabelSource } from './label';
+import { resolveLabel, type LabelSource, type ResolvedLabel } from './label';
 import { assessVisibility } from './visibility';
 import { isCombobox } from '@/core/fill/combobox';
+import { classifyDatePart, type DatePart } from '@/core/fill/date';
 
 /**
  * Walk the document and classify every candidate field.
@@ -53,6 +54,12 @@ export interface FieldCandidate {
    * submits an empty answer.
    */
   isTypeahead: boolean;
+  /**
+   * Which part of a date this control holds, when a date is split across
+   * several of them. All parts of one date classify to the same profile key,
+   * and this says which piece of it to write here.
+   */
+  datePart?: DatePart;
 }
 
 export type DetectedField =
@@ -60,6 +67,46 @@ export type DetectedField =
   | { candidate: FieldCandidate; status: 'skipped'; reason: string }
   | { candidate: FieldCandidate; status: 'unmatched' }
   | { candidate: FieldCandidate; status: 'matched'; key: FieldKey; match: Classification };
+
+/** Words that name a part of a date rather than the date itself. */
+const PART_LABEL = /^(month|day|year|mm|dd|yyyy|yy)([^a-z]|$)/i;
+
+/**
+ * The label of the date group a control belongs to.
+ *
+ * Walks up looking for a container holding at least two date parts -- one
+ * select alone is a date in its own right, but three together are pieces of
+ * one -- then reads that container's heading, skipping any label that merely
+ * names a part.
+ */
+export function dateGroupLabel(el: HTMLElement): ResolvedLabel | undefined {
+  let node: HTMLElement | null = el.parentElement;
+  let hops = 0;
+
+  while (node && hops < 4) {
+    const parts = Array.from(node.querySelectorAll<HTMLElement>('select, input')).filter(
+      (candidate) => classifyDatePart(candidate) !== undefined,
+    );
+
+    if (parts.length >= 2) {
+      for (const heading of Array.from(
+        node.querySelectorAll<HTMLElement>('legend, h1, h2, h3, h4, h5, h6, label, [class*="label" i]'),
+      )) {
+        const text = (heading.textContent ?? '').replace(/\s+/g, ' ').trim();
+        if (text && !PART_LABEL.test(text)) {
+          return { text, source: 'container-heading' };
+        }
+      }
+      // The row holding the parts often has no name of its own -- the date is
+      // named by the fieldset around it -- so keep going rather than give up.
+    }
+
+    node = node.parentElement;
+    hops += 1;
+  }
+
+  return undefined;
+}
 
 /** Collect the attribute values worth matching against. */
 function keyAttributes(el: HTMLElement): string[] {
@@ -115,11 +162,30 @@ export function collectFields(root: Document | ShadowRoot = document): FieldCand
     if (!(node instanceof HTMLElement) || inTemplate(node)) continue;
 
     const visibility = assessVisibility(node);
-    const label = resolveLabel(node);
-    const value =
-      node instanceof HTMLInputElement ||
-      node instanceof HTMLTextAreaElement ||
-      node instanceof HTMLSelectElement
+    const datePart = classifyDatePart(node);
+
+    // A split date's parts are labelled "Month", "Day" and "Year", which say
+    // nothing about *which* date they belong to. The surrounding group's
+    // label -- "Start Date" -- is what the classifier needs, so it is used in
+    // their place when one can be found.
+    const label = datePart
+      ? (dateGroupLabel(node) ?? resolveLabel(node))
+      : resolveLabel(node);
+    // "Does this already hold something?" is a different question for a
+    // toggle: a checkbox's `value` is "on" whether or not it is ticked, so
+    // reading `value` here marks every checkbox as pre-filled and the
+    // detector skips it before it is ever offered.
+    const isToggle =
+      node instanceof HTMLInputElement &&
+      (node.type === 'checkbox' || node.type === 'radio');
+
+    const value = isToggle
+      ? (node as HTMLInputElement).checked
+        ? 'on'
+        : ''
+      : node instanceof HTMLInputElement ||
+          node instanceof HTMLTextAreaElement ||
+          node instanceof HTMLSelectElement
         ? node.value
         : '';
 
@@ -135,6 +201,7 @@ export function collectFields(root: Document | ShadowRoot = document): FieldCand
       prefilled: value.trim() !== '',
       isCombobox: isCombobox(node),
       isTypeahead: looksLikeTypeahead(node),
+      ...(datePart ? { datePart } : {}),
     });
   }
 
@@ -151,6 +218,11 @@ export interface DetectOptions {
   overwriteExisting?: boolean;
   /** Fill voluntary self-identification questions. Off unless opted in. */
   includeDemographics?: boolean;
+}
+
+/** Keys whose value is a date. */
+function isDateKey(key: FieldKey): boolean {
+  return key.endsWith('.startDate') || key.endsWith('.endDate');
 }
 
 export function detectFields(
@@ -190,6 +262,13 @@ export function detectFields(
 
     if (!includeDemographics && classification.key.startsWith('demographics.')) {
       return { candidate, status: 'skipped', reason: 'demographics not enabled' };
+    }
+
+    // A control holding a month or a year cannot be a job title, however the
+    // surrounding text reads. Without this, a month select under a "Current
+    // Role" heading resolves to work.title and writes "March" into it.
+    if (candidate.datePart && !isDateKey(classification.key)) {
+      return { candidate, status: 'unmatched' };
     }
 
     return {

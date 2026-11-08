@@ -1,5 +1,6 @@
 import type { FieldKey } from './keys';
 import type { Profile } from './schema';
+import { candidatesForPart, parseStoredDate, type DatePart } from '@/core/fill/date';
 
 /**
  * Turn a canonical key into the string (or strings) to try writing.
@@ -18,6 +19,11 @@ import type { Profile } from './schema';
 export interface ResolveContext {
   /** 0-based index within a repeating section. */
   index?: number;
+  /**
+   * Set when the form splits a date across several controls. The key is the
+   * same for all of them; this says which piece this one wants.
+   */
+  datePart?: DatePart;
 }
 
 const MONTHS = [
@@ -75,9 +81,14 @@ function dateCandidates(stored: string | undefined): string[] {
   if (!year || !month) return [stored];
 
   const monthName = MONTHS[Number(month) - 1];
+  // Ordered by how specific each form is, and verified by read-back: a
+  // `type=month` takes the first, a `type=date` silently rejects everything
+  // until the full ISO form, and a masked text box takes whichever matches
+  // its own mask. Offering all of them costs nothing because a rejected
+  // value leaves the field empty rather than wrong.
   const out = [stored, `${month}/${year}`];
   if (monthName) out.push(`${monthName} ${year}`, `${monthName.slice(0, 3)} ${year}`);
-  out.push(year);
+  out.push(`${stored}-01`, year);
   return out;
 }
 
@@ -99,6 +110,18 @@ export function resolveValue(
   context: ResolveContext = {},
 ): string[] {
   const index = context.index ?? 0;
+
+  // A split date resolves to one piece of itself. Done here rather than at
+  // the call site so every date key behaves the same way without each one
+  // having to remember.
+  if (context.datePart) {
+    const whole = resolveValue(profile, key, { index });
+    for (const value of whole) {
+      const parsed = parseStoredDate(value);
+      if (parsed) return candidatesForPart(parsed, context.datePart);
+    }
+    return [];
+  }
 
   switch (key) {
     case 'identity.firstName':
