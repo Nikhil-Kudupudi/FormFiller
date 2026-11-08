@@ -15,9 +15,10 @@
     "compile": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test",
+    "test:e2e": "npm run fixtures:build && playwright test",
     "fixtures": "node tests/fixtures/serve.mjs",
-    "postinstall": "wxt prepare"
+    "postinstall": "wxt prepare",
+    "fixtures:build": "esbuild tests/fixtures/probe.entry.ts --bundle --format=iife --outfile=tests/fixtures/probe.js --alias:@=./src"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.0",

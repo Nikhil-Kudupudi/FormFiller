@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>fieldwise fixture — kitchen sink</title>
+<link rel="stylesheet" href="./traps.css">
+<style>
+  body { font: 14px/1.5 system-ui, sans-serif; max-width: 46rem; margin: 2rem auto; padding: 0 1rem; }
+  fieldset { border: 1px solid #ccc; border-radius: 6px; margin: 0 0 1.25rem; padding: 1rem; }
+  legend { font-weight: 600; padding: 0 .4rem; }
+  label { display: block; margin: .5rem 0 .15rem; }
+  input, select, textarea { width: 100%; padding: .4rem; font: inherit; box-sizing: border-box; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+  .echo { color: #555; font-size: .85em; margin-top: .25rem; }
+</style>
+</head>
+<body>
+<h1>fieldwise fixture</h1>
+
+<!-- A site search form. Must never be filled: some submit on input and
+     navigate away mid-fill, losing everything already entered. -->
+<form role="search" id="site-search">
+  <label for="q">Search jobs</label>
+  <input type="search" id="q" name="q">
+</form>
+
+<form id="application">
+  <fieldset>
+    <legend>Your information</legend>
+    <div class="row">
+      <div>
+        <label for="fn">First Name *</label>
+        <input id="fn" name="first_name" autocomplete="given-name">
+      </div>
+      <div>
+        <label for="ln">Last Name *</label>
+        <input id="ln" name="last_name" autocomplete="family-name">
+      </div>
+    </div>
+
+    <label for="em">Email *</label>
+    <input id="em" name="email" type="email" autocomplete="email">
+
+    <label for="em2">Confirm Email *</label>
+    <input id="em2" name="confirm_email" type="email">
+
+    <!-- No <label for>; the label is a sibling div. -->
+    <div>Phone</div>
+    <input name="phone" type="tel">
+
+    <label for="a1">Address Line 1</label>
+    <input id="a1" name="address_line_1" autocomplete="address-line1">
+
+    <label for="a2">Address Line 2</label>
+    <input id="a2" name="address_line_2" autocomplete="address-line2">
+
+    <div class="row">
+      <div>
+        <label for="city">City</label>
+        <input id="city" name="city" autocomplete="address-level2">
+      </div>
+      <div>
+        <label for="st">State</label>
+        <select id="st" name="state" autocomplete="address-level1">
+          <option value="">Select...</option>
+          <option>Massachusetts</option>
+          <option>Virginia</option>
+          <option>West Virginia</option>
+        </select>
+      </div>
+    </div>
+
+    <label for="zip">Zip Code</label>
+    <input id="zip" name="postal_code" autocomplete="postal-code">
+
+    <label for="ctry">Country</label>
+    <select id="ctry" name="country">
+      <option value="">Select...</option>
+      <option>Canada</option>
+      <option>United States of America</option>
+      <option>United States Minor Outlying Islands</option>
+    </select>
+  </fieldset>
+
+  <fieldset>
+    <legend>Experience</legend>
+    <!-- "Company" here means the user's employer, not the hiring company. -->
+    <label for="co">Current Employer</label>
+    <input id="co" name="employer">
+
+    <label for="ti">Job Title</label>
+    <input id="ti" name="job_title">
+
+    <!-- Salutation, NOT a job title. Must not be free-texted. -->
+    <label for="sal">Title</label>
+    <select id="sal" name="salutation">
+      <option value="">Select...</option>
+      <option>Mr</option><option>Ms</option><option>Mx</option><option>Dr</option>
+    </select>
+
+    <label for="li">LinkedIn Profile</label>
+    <input id="li" name="linkedin_url">
+  </fieldset>
+
+  <fieldset>
+    <legend>Eligibility</legend>
+    <!-- Inverted polarity. One profile flag, two opposite correct answers. -->
+    <label for="auth">Are you legally authorized to work in the United States?</label>
+    <select id="auth" name="work_authorized">
+      <option value="">Select...</option><option>Yes</option><option>No</option>
+    </select>
+
+    <label for="spon">Will you now or in the future require sponsorship?</label>
+    <select id="spon" name="requires_sponsorship">
+      <option value="">Select...</option><option>Yes</option><option>No</option>
+    </select>
+  </fieldset>
+
+  <fieldset>
+    <legend>Must never be filled</legend>
+    <label for="pw">Password</label>
+    <input id="pw" name="password" type="password">
+
+    <label for="ssn">Social Security Number</label>
+    <input id="ssn" name="ssn">
+
+    <label for="sal2">Desired Salary</label>
+    <input id="sal2" name="desired_salary">
+
+    <label for="ref">Who referred you?</label>
+    <input id="ref" name="referrer">
+
+    <label for="cl">Cover Letter</label>
+    <textarea id="cl" name="cover_letter" rows="3"></textarea>
+
+    <label><input type="checkbox" name="agree_terms"> I agree to the terms and conditions</label>
+    <label><input type="checkbox" name="agree_arbitration"> I consent to binding arbitration</label>
+  </fieldset>
+
+  <!-- Honeypots. Exactly zero of these may hold a value after a fill.
+       Each uses a different hiding technique; the .trap-* classes live in
+       an external stylesheet so el.style checks cannot see them. -->
+  <input name="url" class="trap-display">
+  <input name="website" class="trap-visibility">
+  <input name="homepage" class="trap-opacity">
+  <input name="fax" class="trap-size">
+  <input name="nickname" class="trap-offscreen">
+  <input name="b_1a2b3c_4d5e6f" class="trap-display">
+  <div class="trap-display"><input name="honeypot"></div>
+  <div aria-hidden="true"><input name="winnie"></div>
+  <input name="bait" tabindex="-1" autocomplete="off" class="trap-clip">
+  <input type="hidden" name="spam">
+</form>
+
+<fieldset>
+  <legend>Framework-controlled input</legend>
+  <!-- Stands in for React: an instance accessor over `value` plus a value
+       tracker. Assigning .value naively updates the tracker as a side effect,
+       the change event is swallowed, and the render below never updates. -->
+  <label for="react-field">Preferred Name</label>
+  <input id="react-field" name="preferred_name">
+  <div class="echo">component state: <span id="react-echo">(empty)</span></div>
+</fieldset>
+
+<!-- Footer newsletter. A different <form>, so it must be left alone. -->
+<form id="newsletter">
+  <label for="nl">Subscribe to our newsletter</label>
+  <input id="nl" name="newsletter_email" type="email">
+</form>
+
+<script src="./react-sim.js"></script>
+<script src="./probe.js"></script>
+</body>
+</html>

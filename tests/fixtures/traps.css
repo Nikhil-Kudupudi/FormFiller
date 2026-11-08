@@ -1,0 +1,19 @@
+/*
+ * Honeypot hiding techniques, in an external stylesheet on purpose.
+ *
+ * A detector that reads `el.style` sees nothing here. Only getComputedStyle
+ * catches these, which is exactly the point of the fixture.
+ */
+
+.trap-display { display: none; }
+.trap-visibility { visibility: hidden; }
+.trap-opacity { opacity: 0; }
+.trap-size { width: 1px; height: 1px; padding: 0; border: 0; }
+.trap-offscreen { position: absolute; left: -9999px; top: -9999px; }
+.trap-clip {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(100%);
+  overflow: hidden;
+}
