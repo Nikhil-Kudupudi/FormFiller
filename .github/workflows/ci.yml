@@ -46,8 +46,12 @@ jobs:
       - name: Install Chromium for Playwright
         run: npx playwright install --with-deps chromium
 
+      # Under a virtual display. An unpacked extension needs a real browser
+      # process: Chromium's headless mode does not load one, so these specs
+      # fail at service-worker startup on a headless runner while every other
+      # spec passes. xvfb is preinstalled on GitHub's Ubuntu images.
       - name: Browser tests
-        run: npm run test:e2e
+        run: xvfb-run -a npm run test:e2e
 
       - name: Upload failure traces
         if: failure()
