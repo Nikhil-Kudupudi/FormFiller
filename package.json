@@ -1,6 +1,6 @@
 {
   "name": "fieldwise",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Cross-browser job-application autofill. Local-first, preview-before-fill, optional bring-your-own-key AI field classification.",
   "license": "MIT",
