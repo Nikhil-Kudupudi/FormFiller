@@ -1,0 +1,120 @@
+name: Release
+
+# Tag a commit to publish a build other people can download:
+#
+#   git tag v0.1.0 && git push origin v0.1.0
+#
+# The release page is a public URL, so testers need no GitHub account and no
+# build tools -- unlike CI artifacts, which only signed-in users can fetch.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (must already exist)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # A broken build must not reach a release page, so the same gates CI
+      # runs apply here rather than trusting that CI already passed.
+      - name: Typecheck
+        run: npm run compile
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser tests
+        run: npm run test:e2e
+
+      - name: Package
+        run: |
+          npm run zip
+          npm run zip:firefox
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          cat > notes.md <<'NOTES'
+          ## Try it
+
+          fieldwise is not in the Chrome Web Store, so it installs as an
+          unpacked extension. This takes a minute and needs no build tools.
+
+          **Chrome, Edge or Brave**
+
+          1. Download `fieldwise-chrome.zip` below and unzip it.
+          2. Open `chrome://extensions` (`edge://extensions`, `brave://extensions`).
+          3. Turn on **Developer mode**, top right.
+          4. Click **Load unpacked** and pick the unzipped folder — the folder
+             itself, not the `manifest.json` inside it.
+
+          **Firefox**
+
+          Open `about:debugging#/runtime/this-firefox`, click **Load Temporary
+          Add-on**, and choose `fieldwise-firefox.zip`. Firefox removes
+          temporary add-ons when it restarts.
+
+          **Then**
+
+          Open the extension's options and fill in your profile — it has
+          nothing to offer until you do. Open a job application, click the
+          fieldwise icon to open the side panel, and press **Scan page**.
+
+          Confident matches arrive ticked. Ambiguous ones like "Country" and
+          "Company" arrive **unticked** on purpose — tick the ones you want.
+          Nothing is written until you press Fill, and nothing is ever
+          submitted. There is an Undo.
+
+          ## What it does with your data
+
+          Your profile is stored by the extension on your own machine. There
+          is no account and no server. The optional AI fallback is off until
+          you add your own API key, and even then it is sent the *shape* of a
+          form — labels and attribute names — never your profile values and
+          never the page text.
+
+          ## Known limits
+
+          See the Known gaps section of the README. In short: it is early,
+          some forms will not be filled, and you should look over any form
+          before you submit it.
+          NOTES
+
+          # Stable asset names: a tester following a link should not have to
+          # care which version produced the file.
+          cp .output/*-chrome.zip  fieldwise-chrome.zip
+          cp .output/*-firefox.zip fieldwise-firefox.zip
+          cp .output/*-sources.zip fieldwise-sources.zip
+
+          gh release create "$TAG" \
+            --title "fieldwise $TAG" \
+            --notes-file notes.md \
+            fieldwise-chrome.zip \
+            fieldwise-firefox.zip \
+            fieldwise-sources.zip

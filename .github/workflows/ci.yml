@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # Lets you build a shareable zip from any branch without tagging a release.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # A new push supersedes an in-flight run for the same ref.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` installs exactly what the lockfile pins, and fails rather
+      # than silently resolving something newer.
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run compile
+
+      - name: Unit tests
+        run: npm run test
+
+      # The browser tests drive a real extension, which needs a real browser.
+      # Only Chromium is installed: Playwright cannot load extensions in
+      # Firefox at all, so the Firefox build is verified by compiling and
+      # packaging it rather than by running it.
+      - name: Install Chromium for Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser tests
+        run: npm run test:e2e
+
+      - name: Upload failure traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+      - name: Package
+        run: |
+          npm run zip
+          npm run zip:firefox
+
+      # Downloadable from the run's summary page. GitHub wraps artifacts in
+      # an outer zip, so a tester unzips twice before loading the folder.
+      - name: Upload builds
+        uses: actions/upload-artifact@v4
+        with:
+          name: fieldwise-${{ github.sha }}
+          path: .output/*.zip
+          if-no-files-found: error
+          retention-days: 30

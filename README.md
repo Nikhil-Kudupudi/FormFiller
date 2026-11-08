@@ -57,6 +57,74 @@ attach.
   reports it instead.
 - Firefox builds but is untested locally.
 
+## Installing
+
+fieldwise is not in any extension store, so it installs unpacked.
+
+**From a release** — no build tools needed. Download `fieldwise-chrome.zip` from the
+[Releases page](https://github.com/Nikhil-Kudupudi/FormFiller/releases) and unzip it. Open
+`chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, and select the unzipped
+folder — the folder itself, not the `manifest.json` inside it. Edge and Brave take the same build
+at `edge://extensions` and `brave://extensions`.
+
+For Firefox, open `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on** and choose
+`fieldwise-firefox.zip`. Firefox discards temporary add-ons when it restarts.
+
+**From source** — see Developing below, then load `.output/chrome-mv3`.
+
+### First run
+
+Open the extension's options and fill in your profile; the panel has nothing to offer until you
+do. Then open a job application, click the fieldwise icon to open the side panel, and press **Scan
+page**. Confident matches arrive ticked and ambiguous ones arrive unticked on purpose. Nothing is
+written until you press Fill, and nothing is ever submitted.
+
+On a site outside the supported host list, click the toolbar icon on that page first — that is
+what grants access to the tab.
+
+## Developing
+
+Every push runs typecheck, unit tests and browser tests and uploads a build. Tagging `v*` publishes
+a release with the zips attached, which is the link to hand someone who wants to try it.
+
+```bash
+npm install
+npm run dev              # Chrome, with HMR
+npm run dev:firefox      # Firefox
+npm run test             # unit tests
+npm run test:e2e         # Playwright, real extension, real browser
+npm run compile          # typecheck
+npm run build            # production build
+npm run zip              # store-ready zip
+npm run zip:firefox      # extension zip plus the sources zip AMO requires
+```
+
+On Windows PowerShell, use `npm.cmd` — the execution policy blocks npm's `.ps1` wrapper by default.
+
+## Architecture
+
+The content script runs in the page's isolated world and **never holds the API key**. It sends a
+sanitized field skeleton to the service worker, which owns the key and makes the provider call.
+That is not only hygiene: since Chrome 85 a content script's `fetch` carries the *page's* origin
+and is subject to CORS even when the extension holds host permissions, so the call could not work
+from there anyway.
+
+A second content script runs in the **MAIN world**. React records an input's last-seen value on
+`el._valueTracker`, a page-world object an isolated script cannot reliably reach. Without resetting
+it, React compares the DOM value against the tracker, sees no change, swallows the `input` event,
+and the next render wipes what was written — leaving a field that looks filled over state that is
+empty. That script shares the page's heap, so it can; and because the page can reach it too, it
+validates every message's origin and shape before acting.
+
+Frames announce themselves. A job board commonly embeds its ATS in a cross-origin iframe, leaving
+the outer page with no fields at all, so the service worker addresses whichever frame reports the
+most fillable fields rather than assuming the top one.
+
+Permissions are deliberately narrow. The extension declares only the ATS hosts it supports plus the
+four LLM endpoints; broader access lives in `optional_host_permissions` and is granted per site, by
+you, at runtime. A hard-coded deny-list keeps it off banking, tax, health and webmail domains
+regardless.
+
 ## What the AI fallback sends
 
 The model is asked what a field *means*, never what should go in it. It receives an opaque id and
