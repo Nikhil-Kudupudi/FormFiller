@@ -31,12 +31,13 @@ Usable. Scan a page, review what will be written, correct anything wrong, apply,
 **Done** — builds for Chrome and Firefox from one source tree; profile editor with versioned
 migrations and import/export; field detection (attributes, eight label strategies, weighted
 scoring with an ambiguity margin); the deny-list and honeypot guard; the fill engine with the
-MAIN-world bridge that makes a write survive a framework re-render; the side panel preview with
+MAIN-world bridge that makes a write survive a framework re-render; custom dropdowns, including
+portalled menus, keyboard-only controls and async typeaheads; the side panel preview with
 per-field confidence and undo; the AI fallback with adapters for Gemini, Grok, OpenAI and
-Anthropic. 102 unit tests and 19 browser tests, five of which drive the real packed extension.
+Anthropic. 122 unit tests and 28 browser tests, seven of which drive the real packed extension.
 
 **Next** — per-ATS adapters (Greenhouse and Lever first), work-history and education repeaters on
-multi-row forms, per-site learned overrides, and resume attach.
+multi-row forms, split date fields, per-site learned overrides, and resume attach.
 
 ### Known gaps
 
@@ -44,8 +45,10 @@ multi-row forms, per-site learned overrides, and resume attach.
   matching page. Zod reaches it through the profile schema; the validation belongs in the service
   worker instead.
 - Repeating sections fill only the first row. A form with three employer rows gets one.
-- Custom dropdowns, async typeaheads and split date fields are not implemented yet, which is most
-  of what makes Workday hard.
+- Split date fields (three selects for month, day and year) are not handled yet.
+- Undo does not clear a custom dropdown. There is no standard way to reset one, and driving a
+  widget's own UI to do it risks leaving a worse state than the one being undone, so the panel
+  reports it instead.
 - Firefox builds but is untested locally.
 
 ## What the AI fallback sends
