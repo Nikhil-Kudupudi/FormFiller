@@ -42,3 +42,106 @@ button {
   cursor: pointer;
 }
 button:hover { border-color: var(--fw-accent); }
+
+/* ---- side panel ---------------------------------------------------- */
+
+.fw-panel { display: flex; flex-direction: column; gap: 0.75rem; min-height: 100vh; }
+
+.fw-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.fw-head h1 { margin: 0; }
+
+.fw-small { font-size: 0.8rem; }
+.fw-error { color: #b91c1c; margin: 0; }
+.fw-warn {
+  margin: 0; padding: 0.5rem 0.625rem; border-radius: 6px;
+  background: color-mix(in srgb, #d97706 12%, transparent);
+  border: 1px solid color-mix(in srgb, #d97706 40%, transparent);
+}
+.fw-notice { margin: 0; color: var(--fw-muted); }
+
+.fw-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; }
+
+.fw-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  padding: 0.4rem 0.5rem; border: 1px solid var(--fw-border); border-radius: 6px;
+  border-left-width: 3px;
+}
+.fw-c-high { border-left-color: #16a34a; }
+.fw-c-medium { border-left-color: #d97706; }
+.fw-c-low { border-left-color: var(--fw-muted); }
+
+.fw-row-main { display: flex; align-items: center; gap: 0.5rem; min-width: 0; flex: 1; margin: 0; cursor: pointer; }
+.fw-row-text { display: grid; min-width: 0; }
+.fw-label { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fw-value { color: var(--fw-muted); font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.fw-meta { display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0; }
+.fw-badge { font-size: 0.7rem; padding: 1px 5px; border-radius: 3px; border: 1px solid var(--fw-border); }
+.fw-b-high { color: #16a34a; border-color: currentColor; }
+.fw-b-medium { color: #d97706; border-color: currentColor; }
+.fw-b-low { color: var(--fw-muted); }
+
+.fw-link {
+  background: none; border: none; padding: 0; color: var(--fw-accent);
+  text-decoration: underline; cursor: pointer; font-size: 0.8rem;
+}
+.fw-link:hover { border: none; }
+
+.fw-actions { position: sticky; bottom: 0; padding-top: 0.5rem; background: var(--fw-bg); }
+.fw-primary {
+  width: 100%; background: var(--fw-accent); color: #fff;
+  border-color: var(--fw-accent); font-weight: 600; padding: 0.55rem;
+}
+.fw-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.fw-result { display: grid; gap: 0.5rem; }
+.fw-result p { margin: 0; }
+.fw-fails { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.2rem; font-size: 0.85rem; }
+.fw-f-label { font-weight: 500; }
+.fw-undo { justify-self: start; }
+
+.fw-omissions { border-top: 1px solid var(--fw-border); padding-top: 0.5rem; }
+.fw-omissions summary { cursor: pointer; color: var(--fw-muted); }
+.fw-omissions section { margin: 0.75rem 0; }
+.fw-omissions h2 { font-size: 0.85rem; margin: 0 0 0.25rem; }
+.fw-omissions ul { margin: 0 0 0.5rem; padding-left: 1.1rem; font-size: 0.85rem; display: grid; gap: 0.15rem; }
+.fw-omissions p { margin: 0.35rem 0 0; }
+
+.fw-foot { margin-top: auto; padding-top: 0.5rem; border-top: 1px solid var(--fw-border); }
+
+/* ---- options page -------------------------------------------------- */
+
+.fw-o-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+
+.fw-section {
+  border: 1px solid var(--fw-border); border-radius: 8px;
+  padding: 1rem; margin: 0 0 1rem; display: grid; gap: 0.6rem;
+}
+.fw-section > h2 { font-size: 0.95rem; margin: 0; }
+.fw-section > p { margin: 0; }
+
+.fw-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.6rem; }
+
+.fw-field { display: grid; gap: 0.2rem; margin: 0; }
+.fw-field > span { font-size: 0.85rem; font-weight: 500; }
+.fw-field input, .fw-field select, .fw-field textarea {
+  font: inherit; padding: 0.4rem; border: 1px solid var(--fw-border);
+  border-radius: 6px; background: var(--fw-bg); color: var(--fw-fg); width: 100%;
+}
+.fw-field small { font-size: 0.75rem; }
+
+.fw-check { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; margin: 0; }
+
+.fw-entry {
+  border: 1px solid var(--fw-border); border-radius: 6px;
+  padding: 0.75rem; display: grid; gap: 0.5rem;
+}
+
+.fw-row-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.fw-file {
+  border: 1px solid var(--fw-border); border-radius: 6px;
+  padding: 0.5rem 0.75rem; cursor: pointer; font-size: 0.9rem;
+}
+.fw-file input { display: none; }
+.fw-danger { color: #b91c1c; }
+.fw-danger:hover { border-color: #b91c1c; }

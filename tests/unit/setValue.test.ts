@@ -1,10 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { selectOption, setChecked, setValue } from '@/core/fill/setValue';
 import { assessVisibility } from '@/core/detect/visibility';
+import { FillSession } from '@/core/fill/session';
+import { layOutPage } from './helpers/layout';
 
 beforeEach(() => {
   document.body.innerHTML = '';
 });
+
+/** happy-dom does no layout, so elements need a plausible box to look real. */
+function laidOut(): void {
+  layOutPage();
+}
 
 function input(attrs: Record<string, string> = {}): HTMLInputElement {
   const el = document.createElement('input');
@@ -200,5 +207,69 @@ describe('honeypot detection', () => {
     const r = assessVisibility(el);
     expect(r.visible).toBe(false);
     expect(r.honeypot).toBe(false);
+  });
+});
+
+describe('undo restores by element kind', () => {
+  it('restores a text input to its previous value', async () => {
+    // Regression: a text input is an HTMLInputElement, so recording its
+    // `checked` state made undo take the checkbox branch -- which confirmed
+    // the box was already unchecked, reported success, and never restored
+    // the text.
+    document.body.innerHTML = `<input id="t" name="first_name" value="draft">`;
+    const el = document.querySelector('input')!;
+    laidOut();
+
+    const session = new FillSession();
+    session.setCandidates([
+      {
+        element: el,
+        id: 'f_0',
+        label: 'First Name',
+        labelSource: 'none',
+        attributes: ['first_name'],
+        type: 'text',
+        visible: true,
+        honeypot: false,
+        prefilled: true,
+      },
+    ]);
+
+    // Force the overwrite path: the field already holds a draft.
+    el.value = '';
+    // No MAIN-world helper here, so the bridge times out and the
+    // isolated-world write takes over -- which is the documented fallback.
+    expect((await session.fill('f_0', 'First Name', ['Ada'])).ok).toBe(true);
+    expect(el.value).toBe('Ada');
+
+    expect(session.undo()).toBe(1);
+    expect(el.value).toBe('');
+  });
+
+  it('restores a checkbox to its previous state', async () => {
+    document.body.innerHTML = `<input type="checkbox" id="c" name="currently_work_here">`;
+    const el = document.querySelector('input')!;
+    laidOut();
+
+    const session = new FillSession();
+    session.setCandidates([
+      {
+        element: el,
+        id: 'f_0',
+        label: 'I currently work here',
+        labelSource: 'none',
+        attributes: ['currently_work_here'],
+        type: 'checkbox',
+        visible: true,
+        honeypot: false,
+        prefilled: false,
+      },
+    ]);
+
+    await session.fill('f_0', 'I currently work here', ['Yes']);
+    expect(el.checked).toBe(true);
+
+    session.undo();
+    expect(el.checked).toBe(false);
   });
 });
