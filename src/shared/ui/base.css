@@ -145,3 +145,11 @@ button:hover { border-color: var(--fw-accent); }
 .fw-file input { display: none; }
 .fw-danger { color: #b91c1c; }
 .fw-danger:hover { border-color: #b91c1c; }
+
+.fw-sections { display: grid; gap: 0.5rem; }
+.fw-section-note {
+  border: 1px solid var(--fw-border); border-left: 3px solid var(--fw-accent);
+  border-radius: 6px; padding: 0.5rem 0.625rem; display: grid; gap: 0.4rem;
+}
+.fw-section-note p { margin: 0; font-size: 0.875rem; }
+.fw-section-note button { justify-self: start; }

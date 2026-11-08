@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>fieldwise fixture — repeating sections</title>
+<style>
+  body { font: 14px/1.5 system-ui, sans-serif; max-width: 46rem; margin: 2rem auto; padding: 0 1rem; }
+  fieldset { border: 1px solid #ccc; border-radius: 6px; margin: 0 0 1.25rem; padding: 1rem; }
+  legend { font-weight: 600; padding: 0 .4rem; }
+  label { display: block; margin: .5rem 0 .15rem; }
+  input { width: 100%; padding: .4rem; font: inherit; box-sizing: border-box; }
+  .entry { border: 1px solid #ddd; border-radius: 4px; padding: .75rem; margin: 0 0 .75rem; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+</style>
+</head>
+<body>
+<h1>Repeating sections</h1>
+
+<form id="application">
+
+  <fieldset id="work-indexed">
+    <legend>Work Experience</legend>
+    <!-- The index is written into every field name, which is authoritative:
+         experience[0] and "employer 1" mean the same row, so where a form
+         states it there is nothing to infer. -->
+    <div class="entry">
+      <div class="cols">
+        <div><label for="c0">Company</label>
+          <input id="c0" name="experience[0][company]"></div>
+        <div><label for="t0">Job Title</label>
+          <input id="t0" name="experience[0][title]"></div>
+      </div>
+    </div>
+    <div class="entry">
+      <div class="cols">
+        <div><label for="c1">Company</label>
+          <input id="c1" name="experience[1][company]"></div>
+        <div><label for="t1">Job Title</label>
+          <input id="t1" name="experience[1][title]"></div>
+      </div>
+    </div>
+    <div class="entry">
+      <div class="cols">
+        <div><label for="c2">Company</label>
+          <input id="c2" name="experience[2][company]"></div>
+        <div><label for="t2">Job Title</label>
+          <input id="t2" name="experience[2][title]"></div>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset id="education-cloned">
+    <legend>Education</legend>
+    <!-- Cloned markup: every row carries identical names, so the only
+         evidence of which row a field is in is its position. -->
+    <div id="edu-rows">
+      <div class="entry edu-row">
+        <div class="cols">
+          <div><label>School</label><input name="school"></div>
+          <div><label>Degree</label><input name="degree"></div>
+        </div>
+      </div>
+    </div>
+    <button type="button" id="add-education">+ Add another school</button>
+  </fieldset>
+
+  <fieldset id="work-addable">
+    <legend>Previous Roles</legend>
+    <!-- One row, and a button that makes more. -->
+    <div id="role-rows">
+      <div class="entry role-row">
+        <div class="cols">
+          <div><label>Employer</label><input name="employer"></div>
+          <div><label>Position</label><input name="position"></div>
+        </div>
+      </div>
+    </div>
+    <button type="button" id="add-role">Add another position</button>
+  </fieldset>
+
+</form>
+
+<script src="./repeaters.js"></script>
+<script src="./repeater-probe.js"></script>
+</body>
+</html>

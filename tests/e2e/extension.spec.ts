@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { test as base, chromium, expect, type BrowserContext } from '@playwright/test';
+import { test as base, chromium, expect, type BrowserContext, type Page } from '@playwright/test';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const EXTENSION = path.resolve(here, '../../.output/chrome-mv3');
@@ -13,6 +13,7 @@ const EXTENSION = path.resolve(here, '../../.output/chrome-mv3');
  */
 const ATS_URL = 'https://jobs.lever.co/acme/engineer/apply';
 const ATS_DROPDOWN_URL = 'https://jobs.lever.co/acme/engineer/dropdowns';
+const ATS_REPEATER_URL = 'https://jobs.lever.co/acme/engineer/repeaters';
 const FIXTURE_ORIGIN = 'http://127.0.0.1:4321';
 
 /**
@@ -56,7 +57,9 @@ async function routeFixture(context: BrowserContext): Promise<void> {
         ? 'kitchen-sink.html'
         : url.pathname === '/acme/engineer/dropdowns'
           ? 'dropdowns.html'
-          : url.pathname.split('/').pop();
+          : url.pathname === '/acme/engineer/repeaters'
+            ? 'repeaters.html'
+            : url.pathname.split('/').pop();
     const upstream = await fetch(`${FIXTURE_ORIGIN}/${file}`);
     await route.fulfill({
       status: upstream.status,
@@ -90,8 +93,15 @@ async function seedProfile(context: BrowserContext): Promise<void> {
         country: 'United States of America',
       },
       links: {},
-      work: [],
-      education: [],
+      work: [
+        { id: 'w1', company: 'Analytical Engines', title: 'Principal Engineer', isCurrent: true },
+        { id: 'w2', company: 'Difference Machines', title: 'Senior Engineer', isCurrent: false },
+        { id: 'w3', company: 'Babbage & Co', title: 'Engineer', isCurrent: false },
+      ],
+      education: [
+        { id: 'e1', school: 'MIT', degree: "Bachelor's Degree" },
+        { id: 'e2', school: 'Cambridge', degree: "Master's Degree" },
+      ],
       eligibility: { workAuthorized: true, requiresSponsorship: false },
       preferences: { preferredLocations: [] },
       documents: {},
@@ -106,6 +116,20 @@ async function seedProfile(context: BrowserContext): Promise<void> {
     };
     await api.storage.local.set({ 'profile:v1': profile });
   });
+}
+
+/**
+ * Tick every proposal, as a user reviewing the list would.
+ *
+ * Ambiguous labels like "Company" and "School" arrive unticked by design, so
+ * a test that only clicks Fill exercises whichever fields happened to score
+ * high rather than the ones it means to.
+ */
+async function acceptAll(panel: Page): Promise<void> {
+  const boxes = panel.getByRole('checkbox');
+  for (let i = 0; i < (await boxes.count()); i++) {
+    await boxes.nth(i).check();
+  }
 }
 
 test('the service worker starts and registers', async ({ context, extensionId }) => {
@@ -249,4 +273,60 @@ test('fills a custom dropdown through the extension', async ({ context, extensio
     'United States of America',
     { timeout: 15_000 },
   );
+});
+
+test('fills each repeating row with its own entry', async ({ context, extensionId }) => {
+  await seedProfile(context);
+  await routeFixture(context);
+
+  const target = await context.newPage();
+  await target.goto(ATS_REPEATER_URL);
+  const panel = await context.newPage();
+  await panel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+  await target.bringToFront();
+
+  await panel.getByRole('button', { name: 'Scan page' }).click();
+  const fill = panel.getByRole('button', { name: /^Fill \d+ fields?$/ });
+  await expect(fill).toBeVisible({ timeout: 10_000 });
+  await acceptAll(panel);
+  await fill.click();
+
+  // Three different jobs in three rows, rather than the current one three
+  // times -- which is what the whole feature exists to prevent.
+  await expect(target.locator('#c0')).toHaveValue('Analytical Engines', { timeout: 10_000 });
+  await expect(target.locator('#c1')).toHaveValue('Difference Machines');
+  await expect(target.locator('#c2')).toHaveValue('Babbage & Co');
+});
+
+test('offers to add rows and fills them once added', async ({ context, extensionId }) => {
+  await seedProfile(context);
+  await routeFixture(context);
+
+  const target = await context.newPage();
+  await target.goto(ATS_REPEATER_URL);
+  const panel = await context.newPage();
+  await panel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+  await target.bringToFront();
+
+  await panel.getByRole('button', { name: 'Scan page' }).click();
+
+  // One education row on the page, two entries in the profile. Adding rows
+  // changes the page, so it is offered rather than done during a scan.
+  const addRows = panel.getByRole('button', { name: /^Add \d+ more rows?$/ });
+  await expect(addRows).toBeVisible({ timeout: 10_000 });
+
+  await expect(target.locator('#edu-rows .edu-row')).toHaveCount(1);
+  await addRows.click();
+  await expect(target.locator('#edu-rows .edu-row')).toHaveCount(2, { timeout: 10_000 });
+
+  // Adding a row re-scans, so every field id from before is stale. Wait for
+  // the new list before touching it, or the ticks land on the old one.
+  await expect(addRows).toBeHidden({ timeout: 10_000 });
+  await expect(panel.getByRole('button', { name: /^Fill \d+ fields?$/ })).toBeVisible();
+  await acceptAll(panel);
+  await panel.getByRole('button', { name: /^Fill \d+ fields?$/ }).click();
+
+  const schools = target.locator('#edu-rows input[name="school"]');
+  await expect(schools.nth(0)).toHaveValue('MIT', { timeout: 10_000 });
+  await expect(schools.nth(1)).toHaveValue('Cambridge');
 });

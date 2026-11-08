@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 import { browser } from 'wxt/browser';
-import { sendToBackground, type ApplyResult, type Proposal, type ScanResult } from '@/shared/messaging';
+import {
+  sendToBackground,
+  type ApplyResult,
+  type Proposal,
+  type ScanResult,
+  type SectionStatus,
+} from '@/shared/messaging';
 
 /**
  * The primary surface.
@@ -89,6 +95,17 @@ export function App() {
     }
   };
 
+  const expand = async (section: 'work' | 'education') => {
+    setNotice(undefined);
+    const reply = await sendToBackground({ type: 'expand-rows', section });
+    if (!reply.ok) {
+      setNotice(reply.error);
+      return;
+    }
+    // The page changed, so every field id from the last scan is stale.
+    await scan();
+  };
+
   const runAi = async () => {
     setAiBusy(true);
     setNotice(undefined);
@@ -159,6 +176,10 @@ export function App() {
             </section>
           )}
 
+          {status.kind === 'ready' && status.scan.sections.length > 0 && (
+            <Sections sections={status.scan.sections} onExpand={(s) => void expand(s)} />
+          )}
+
           {status.kind === 'ready' && (
             <>
               <ProposalList
@@ -192,6 +213,39 @@ export function App() {
         </button>
       </footer>
     </main>
+  );
+}
+
+/**
+ * Repeating sections with fewer rows than the profile has entries.
+ *
+ * Offered rather than done automatically: clicking Add changes the page, and
+ * nothing should change before the user has asked for it.
+ */
+function Sections(props: {
+  sections: SectionStatus[];
+  onExpand: (section: 'work' | 'education') => void;
+}) {
+  return (
+    <div class="fw-sections">
+      {props.sections.map((s) => (
+        <div key={s.section} class="fw-section-note">
+          <p>
+            {s.label}: this form shows {s.rows} {s.rows === 1 ? 'row' : 'rows'} and you have{' '}
+            {s.entries} {s.entries === 1 ? 'entry' : 'entries'}.
+          </p>
+          {s.canAdd ? (
+            <button type="button" onClick={() => props.onExpand(s.section)}>
+              Add {s.entries - s.rows} more {s.entries - s.rows === 1 ? 'row' : 'rows'}
+            </button>
+          ) : (
+            <p class="fw-muted fw-small">
+              No Add button found, so only the first {s.rows} will be filled.
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
   );
 }
 

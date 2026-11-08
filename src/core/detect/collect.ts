@@ -4,6 +4,8 @@ import { resolveLabel, type LabelSource, type ResolvedLabel } from './label';
 import { assessVisibility } from './visibility';
 import { isCombobox } from '@/core/fill/combobox';
 import { classifyDatePart, type DatePart } from '@/core/fill/date';
+import { groupByContainer, inferIndexFromAttributes } from './repeater';
+import { isRepeatingKey } from '@/core/profile/keys';
 
 /**
  * Walk the document and classify every candidate field.
@@ -66,7 +68,14 @@ export type DetectedField =
   | { candidate: FieldCandidate; status: 'denied'; reason: string }
   | { candidate: FieldCandidate; status: 'skipped'; reason: string }
   | { candidate: FieldCandidate; status: 'unmatched' }
-  | { candidate: FieldCandidate; status: 'matched'; key: FieldKey; match: Classification };
+  | {
+      candidate: FieldCandidate;
+      status: 'matched';
+      key: FieldKey;
+      match: Classification;
+      /** Which entry of a repeating section this belongs to. 0 when single. */
+      rowIndex: number;
+    };
 
 /** Words that name a part of a date rather than the date itself. */
 const PART_LABEL = /^(month|day|year|mm|dd|yyyy|yy)([^a-z]|$)/i;
@@ -231,7 +240,7 @@ export function detectFields(
 ): DetectedField[] {
   const { overwriteExisting = false, includeDemographics = false } = options;
 
-  return candidates.map((candidate): DetectedField => {
+  const detected = candidates.map((candidate): DetectedField => {
     // A honeypot is never written to, whatever else we conclude. This is the
     // check that keeps the user from being flagged as a bot.
     if (candidate.honeypot) {
@@ -276,6 +285,93 @@ export function detectFields(
       status: 'matched',
       key: classification.key,
       match: classification,
+      // Filled in by the pass below, which needs to see every field at once.
+      rowIndex: 0,
     };
   });
+
+  return assignRowIndices(detected);
+}
+
+/** Identity for a section container, stable within one scan. */
+const containerIds = new WeakMap<Element, string>();
+let containerCounter = 0;
+
+function containerKey(el: Element | undefined): string {
+  if (!el) return 'page';
+  let id = containerIds.get(el);
+  if (!id) {
+    id = `s${containerCounter++}`;
+    containerIds.set(el, id);
+  }
+  return id;
+}
+
+/** The block a repeating section lives in, usually a fieldset. */
+function sectionContainer(el: HTMLElement): Element | undefined {
+  return (
+    el.closest('fieldset') ??
+    el.closest('section') ??
+    el.closest('[class*="section" i]') ??
+    undefined
+  );
+}
+
+/**
+ * Work out which entry of a repeating section each field belongs to.
+ *
+ * Runs after classification because it needs the key: a field is only part of
+ * a repeating section if it resolves to one, and the grouping is per section
+ * rather than per page.
+ *
+ * An index written into the markup wins outright. Only when a section carries
+ * none does position in the document decide, and then the whole section is
+ * grouped together so a row missing one field does not shift the rest.
+ */
+function assignRowIndices(detected: DetectedField[]): DetectedField[] {
+  const sections = new Map<string, DetectedField[]>();
+
+  for (const field of detected) {
+    if (field.status !== 'matched' || !isRepeatingKey(field.key)) continue;
+
+    // Scoped to the enclosing section, not to the whole page. A form can
+    // carry two work-history blocks -- "Work Experience" and "Previous
+    // Roles" -- and numbering them together would give two different fields
+    // the same row, so both receive the same job.
+    const container = sectionContainer(field.candidate.element);
+    const section = `${field.key.split('.')[0] ?? ''}:${containerKey(container)}`;
+
+    const existing = sections.get(section);
+    if (existing) existing.push(field);
+    else sections.set(section, [field]);
+  }
+
+  for (const fields of sections.values()) {
+    const inferred = new Map<DetectedField, number>();
+    for (const field of fields) {
+      const index = inferIndexFromAttributes([
+        ...field.candidate.attributes,
+        field.candidate.label,
+      ]);
+      if (index !== undefined) inferred.set(field, index);
+    }
+
+    if (inferred.size > 0) {
+      // The markup says which row each field is in; trust it, and leave
+      // anything it does not name in row 0 rather than inventing a position.
+      for (const field of fields) {
+        if (field.status === 'matched') field.rowIndex = inferred.get(field) ?? 0;
+      }
+      continue;
+    }
+
+    const byContainer = groupByContainer(fields.map((f) => f.candidate.element));
+    for (const field of fields) {
+      if (field.status === 'matched') {
+        field.rowIndex = byContainer.get(field.candidate.element) ?? 0;
+      }
+    }
+  }
+
+  return detected;
 }

@@ -168,6 +168,19 @@ async function handle(message: ToBackground | { type: 'get-profile' }): Promise<
       return { ok: true, aiSettings: next };
     }
 
+    case 'expand-rows': {
+      const profile = await loadProfile();
+      const target =
+        message.section === 'work' ? profile.work.length : profile.education.length;
+      return withContentScript(await activeTabId(), (id) =>
+        browser.tabs.sendMessage(
+          id,
+          { type: 'expand-rows', section: message.section, target },
+          { frameId: 0 },
+        ),
+      );
+    }
+
     case 'run-ai':
       return runAi();
 

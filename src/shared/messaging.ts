@@ -33,6 +33,18 @@ export interface Omission {
   reason: string;
 }
 
+/** A repeating section, and how its rows compare to the profile. */
+export interface SectionStatus {
+  section: 'work' | 'education';
+  label: string;
+  /** Rows the form currently shows. */
+  rows: number;
+  /** Entries the profile holds. */
+  entries: number;
+  /** True when the form has an Add control we could click. */
+  canAdd: boolean;
+}
+
 export interface ScanResult {
   url: string;
   proposals: Proposal[];
@@ -44,6 +56,8 @@ export interface ScanResult {
   unmatched: Omission[];
   /** True when something on the page is structurally unreachable. */
   hasClosedShadowRoot: boolean;
+  /** Repeating sections that hold fewer rows than the profile has entries. */
+  sections: SectionStatus[];
 }
 
 export interface ApplyResult {
@@ -73,7 +87,8 @@ export type ToBackground =
   | { type: 'highlight'; fieldId: string }
   | { type: 'get-ai-settings' }
   | { type: 'set-ai-site-opt-in'; origin: string; enabled: boolean }
-  | { type: 'run-ai'; fieldIds: string[] };
+  | { type: 'run-ai'; fieldIds: string[] }
+  | { type: 'expand-rows'; section: 'work' | 'education' };
 
 /** Service worker -> content script. */
 export type ToContent =
@@ -83,7 +98,9 @@ export type ToContent =
   | { type: 'highlight'; fieldId: string }
   | { type: 'collect-unmatched' }
   /** The model's raw reply, sent back for guarding against the live DOM. */
-  | { type: 'guard-ai'; raw: string; sent: SkeletonField[] };
+  | { type: 'guard-ai'; raw: string; sent: SkeletonField[] }
+  /** Click the form's own Add control until it has room for every entry. */
+  | { type: 'expand-rows'; section: 'work' | 'education'; target: number };
 
 export type BackgroundReply =
   | { ok: true; scan: ScanResult }

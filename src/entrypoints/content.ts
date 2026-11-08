@@ -1,8 +1,15 @@
 import { defineContentScript } from 'wxt/utils/define-content-script';
 import { browser } from 'wxt/browser';
 import { ATS_HOSTS, isNeverRunHost } from '@/shared/hosts';
-import type { Omission, Proposal, ScanResult, ToContent } from '@/shared/messaging';
-import { collectFields, detectFields } from '@/core/detect/collect';
+import type {
+  Omission,
+  Proposal,
+  ScanResult,
+  SectionStatus,
+  ToContent,
+} from '@/shared/messaging';
+import { collectFields, detectFields, type DetectedField } from '@/core/detect/collect';
+import { MAX_ROWS, findAddButton } from '@/core/detect/repeater';
 import { FillSession } from '@/core/fill/session';
 import { clearMarkers, focusElement, markElement, trackMarkers } from '@/core/fill/highlight';
 import { profileSchema, type Profile } from '@/core/profile/schema';
@@ -86,17 +93,27 @@ export default defineContentScript({
         }
 
         const values = resolveValue(profile, field.key, {
+          index: field.rowIndex,
           ...(field.candidate.datePart ? { datePart: field.candidate.datePart } : {}),
         });
         if (values.length === 0 || !values[0]) {
-          missingValue.push({ label, reason: 'nothing in your profile for this' });
+          missingValue.push({
+            label,
+            reason:
+              field.rowIndex > 0
+                ? `you have no entry ${field.rowIndex + 1} for this section`
+                : 'nothing in your profile for this',
+          });
           continue;
         }
 
         proposals.push({
           fieldId: field.candidate.id,
           key: field.key,
-          label,
+          // Three fields all labelled "Company" are indistinguishable in the
+          // panel otherwise, and the user cannot tell whether the right job
+          // landed in the right row.
+          label: field.rowIndex > 0 ? `${label} (entry ${field.rowIndex + 1})` : label,
           value: values[0],
           confidence: field.match.confidence,
           via: field.match.via,
@@ -113,7 +130,99 @@ export default defineContentScript({
         missingValue,
         unmatched,
         hasClosedShadowRoot: hasClosedRoot(),
+        sections: sectionStatus(detected, profile),
       };
+    }
+
+    /**
+     * How each repeating section compares to the profile.
+     *
+     * Reported rather than acted on: adding rows changes the page, and
+     * nothing should change before the user has confirmed anything.
+     */
+    function sectionStatus(detected: DetectedField[], profile: Profile): SectionStatus[] {
+      const out: SectionStatus[] = [];
+
+      for (const [section, label, entries] of [
+        ['work', 'Work history', profile.work.length],
+        ['education', 'Education', profile.education.length],
+      ] as const) {
+        const fields = detected.filter(
+          (f) => f.status === 'matched' && f.key.startsWith(`${section}.`),
+        );
+        if (fields.length === 0) continue;
+
+        const rows = new Set(
+          fields.map((f) => (f.status === 'matched' ? f.rowIndex : 0)),
+        ).size;
+
+        if (entries > rows) {
+          out.push({
+            section,
+            label,
+            rows,
+            entries: Math.min(entries, MAX_ROWS),
+            canAdd: findSectionAddButton(fields) !== undefined,
+          });
+        }
+      }
+
+      return out;
+    }
+
+    /** The Add control belonging to a section, found from one of its fields. */
+    function findSectionAddButton(fields: DetectedField[]): HTMLElement | undefined {
+      for (const field of fields) {
+        let node: HTMLElement | null = field.candidate.element.parentElement;
+        let hops = 0;
+        while (node && hops < 8) {
+          const button = findAddButton(node);
+          if (button) return button;
+          node = node.parentElement;
+          hops += 1;
+        }
+      }
+      return undefined;
+    }
+
+    /**
+     * Click the form's own Add control until it has room for every entry.
+     *
+     * Capped, and each click waits for the row to appear: a form that ignores
+     * the click would otherwise be left with dozens of empty rows for the
+     * user to delete by hand, which is worse than an unfilled section.
+     */
+    async function expandRows(section: 'work' | 'education', target: number) {
+      const countRows = () => {
+        const detected = detectFields(collectFields(), { includeDemographics: true });
+        const fields = detected.filter(
+          (f) => f.status === 'matched' && f.key.startsWith(`${section}.`),
+        );
+        return {
+          rows: new Set(fields.map((f) => (f.status === 'matched' ? f.rowIndex : 0))).size,
+          fields,
+        };
+      };
+
+      let { rows, fields } = countRows();
+      let added = 0;
+
+      while (rows < Math.min(target, MAX_ROWS) && added < MAX_ROWS) {
+        const button = findSectionAddButton(fields);
+        if (!button) break;
+
+        const before = rows;
+        button.click();
+        await new Promise((resolve) => setTimeout(resolve, 250));
+
+        ({ rows, fields } = countRows());
+        added += 1;
+
+        // The click did nothing. Stop rather than keep poking it.
+        if (rows === before) break;
+      }
+
+      return { rows, added };
     }
 
     /** Fill the fields the user ticked, and mark what landed. */
@@ -122,14 +231,21 @@ export default defineContentScript({
       const failed: { fieldId: string; label: string; reason: string }[] = [];
       drawn = [];
 
-      for (const fieldId of orderForFilling(fieldIds, session, profile)) {
+      // Detect once, over every field on the page. Re-running detection per
+      // field would hand the row grouping a single element to look at, and
+      // every row would come back as the first one -- so each row of a
+      // repeating section would receive the same entry.
+      const detectedAll = detectFields(session.all(), { includeDemographics: true });
+      const byId = new Map(detectedAll.map((f) => [f.candidate.id, f]));
+
+      for (const fieldId of orderForFilling(fieldIds, byId)) {
         const candidate = session.get(fieldId);
         if (!candidate) {
           failed.push({ fieldId, label: '(gone)', reason: 'field is no longer on the page' });
           continue;
         }
 
-        const detected = detectFields([candidate], { includeDemographics: true })[0];
+        const detected = byId.get(fieldId);
         if (!detected || detected.status !== 'matched') {
           failed.push({
             fieldId,
@@ -140,6 +256,7 @@ export default defineContentScript({
         }
 
         const values = resolveValue(profile, detected.key, {
+          index: detected.rowIndex,
           ...(candidate.datePart ? { datePart: candidate.datePart } : {}),
         });
         const outcome = await session.fill(fieldId, candidate.label || '(no label)', values);
@@ -225,6 +342,13 @@ export default defineContentScript({
           return true;
         }
 
+        case 'expand-rows': {
+          void expandRows(message.section, message.target).then((result) =>
+            sendResponse({ ok: true, expanded: result }),
+          );
+          return true;
+        }
+
         case 'guard-ai': {
           // The model's answer is re-checked here, in the one context that
           // holds the live elements. A suggestion that would land on a
@@ -292,14 +416,10 @@ export default defineContentScript({
  */
 function orderForFilling(
   fieldIds: string[],
-  session: FillSession,
-  profile: Profile,
+  byId: Map<string, DetectedField>,
 ): string[] {
   const weight = (fieldId: string): number => {
-    const candidate = session.get(fieldId);
-    if (!candidate) return 1;
-
-    const detected = detectFields([candidate], { includeDemographics: true })[0];
+    const detected = byId.get(fieldId);
     if (!detected || detected.status !== 'matched') return 1;
 
     if (detected.key === 'contact.phoneDeviceType') return 0;
@@ -308,7 +428,6 @@ function orderForFilling(
     return 1;
   };
 
-  void profile;
   return [...fieldIds].sort((a, b) => weight(a) - weight(b));
 }
 
